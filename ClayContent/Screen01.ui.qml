@@ -4,10 +4,13 @@ It is supposed to be strictly declarative and only uses a subset of QML. If you 
 this file manually, you might introduce QML code that is not supported by Qt Design Studio.
 Check out https://doc.qt.io/qtcreator/creator-quick-ui-forms.html for details on .ui.qml files.
 */
-
 import QtQuick
 import QtQuick.Controls
 import Clay
+
+// Pour ouvrir le projet sur Qt Design Studio, il faut commenter l'import suivant
+// (oui c'est un peu con, mais bon...)
+import MyGL 1.0
 
 Rectangle {
     id: rectangle
@@ -16,56 +19,33 @@ Rectangle {
 
     color: Constants.backgroundColor
 
-    Button {
-        id: button
-        text: qsTr("Press me")
-        anchors.verticalCenter: parent.verticalCenter
-        checkable: true
-        anchors.horizontalCenter: parent.horizontalCenter
-
-        Connections {
-            target: button
-            onClicked: animation.start()
-        }
+    Rectangle {
+        id: rightPanel
+        width: 420
+        color: "#222222"
+        border.width: 0
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: 0
+        anchors.topMargin: 0
+        anchors.bottomMargin: 0
     }
 
-    Text {
-        id: label
-        text: qsTr("Hello Clay")
-        anchors.top: button.bottom
-        font.family: Constants.font.family
-        anchors.topMargin: 45
-        anchors.horizontalCenter: parent.horizontalCenter
+    Rectangle {
+        id: leftPanel
+        border.width: 0
+        anchors.left: rightPanel.right
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: 0
+        anchors.rightMargin: 0
+        anchors.topMargin: 0
+        anchors.bottomMargin: 0
 
-        SequentialAnimation {
-            id: animation
-
-            ColorAnimation {
-                id: colorAnimation1
-                target: rectangle
-                property: "color"
-                to: "#2294c6"
-                from: Constants.backgroundColor
-            }
-
-            ColorAnimation {
-                id: colorAnimation2
-                target: rectangle
-                property: "color"
-                to: Constants.backgroundColor
-                from: "#2294c6"
-            }
+        MyGLItem {
+            anchors.fill: parent
         }
     }
-    states: [
-        State {
-            name: "clicked"
-            when: button.checked
-
-            PropertyChanges {
-                target: label
-                text: qsTr("Button Checked")
-            }
-        }
-    ]
 }
