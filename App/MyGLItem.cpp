@@ -8,6 +8,7 @@
 #include <QObject>
 #include <QElapsedTimer>
 #include <QtGlobal>
+#include <QQuickWindow>
 
 // QMatrix4x4 vers float*
 static const float *toPtr(const QMatrix4x4 &m) { return m.constData(); }
@@ -28,20 +29,6 @@ void MyGLItem::setGridResolution(int r) {
     update();
 }
 
-// Setters ajoutés
-void MyGLItem::setYaw(const float y) {
-    if (qFuzzyCompare(m_yaw, y)) return;
-    m_yaw = y;
-    emit yawChanged();
-    update();
-}
-void MyGLItem::setPitch(float p) {
-    p = qBound(-89.f, p, 89.f);
-    if (qFuzzyCompare(m_pitch, p)) return;
-    m_pitch = p;
-    emit pitchChanged();
-    update();
-}
 void MyGLItem::setCameraSpeed(const float s) {
     const float old = m_camera.speed();
     m_camera.setSpeed(s);
@@ -51,8 +38,8 @@ void MyGLItem::setCameraSpeed(const float s) {
 }
 void MyGLItem::setMouseSensitivity(float s) {
     if (s < 0.f) s = 0.f;
-    if (qFuzzyCompare(m_mouseSensitivity, s)) return;
-    m_mouseSensitivity = s;
+    if (qFuzzyCompare(m_camera.mouseSensitivity(), s)) return;
+    m_camera.setMouseSensitivity(s);
     emit mouseSensitivityChanged();
 }
 void MyGLItem::setDrawGrid(const bool v) {
@@ -64,6 +51,11 @@ void MyGLItem::setDrawAxes(const bool v) {
     if (m_drawAxes == v) return;
     m_drawAxes = v;
     emit drawAxesChanged();
+}
+void MyGLItem::setOrbitDistance(const float d) {
+    const float old = m_camera.orbitDistance();
+    m_camera.setOrbitDistance(d);
+    if (!qFuzzyCompare(old, m_camera.orbitDistance())) emit orbitDistanceChanged();
 }
 
 void MyGLItem::keyPressEvent(QKeyEvent *event) {
@@ -77,21 +69,55 @@ void MyGLItem::keyReleaseEvent(QKeyEvent *event) {
 }
 
 void MyGLItem::mousePressEvent(QMouseEvent *event) {
-    m_input.mousePress(event);
+    m_input.mousePress(event, window());
     forceActiveFocus();
     update();
 }
 
 void MyGLItem::mouseMoveEvent(QMouseEvent *event) {
-    m_input.mouseMove(event, m_yaw, m_pitch, m_mouseSensitivity);
-    emit yawChanged();
-    emit pitchChanged();
+    const QQuickWindow *w = window();
+    const QPoint itemPosInWindow = mapToScene(QPointF()).toPoint();
+    const QPoint localPos = w->mapFromGlobal(QCursor::pos());
+    const QRect rect(itemPosInWindow, QSize(width(), height()));
+
+    m_input.mouseMove(event, w, localPos, rect);
+    if (m_input.rightButtonDown() || m_input.middleButtonDown()) {
+        const QPoint delta = m_input.mouseDelta();
+        float y = m_camera.yaw();
+        float p = m_camera.pitch();
+        const float sens = m_camera.mouseSensitivity();
+        y += static_cast<float>(delta.x()) * sens;
+        p += static_cast<float>(-delta.y()) * sens;
+        m_camera.setYaw(y);
+        m_camera.setPitch(p);
+        emit yawChanged();
+        emit pitchChanged();
+    }
+
     update();
 }
 
 void MyGLItem::mouseReleaseEvent(QMouseEvent *event) {
-    m_input.mouseRelease(event);
+    m_input.mouseRelease(event, window());
+
     update();
+}
+
+// TODO FIX
+void MyGLItem::wheelEvent(QWheelEvent *event) {
+    const QPoint numDegrees = event->angleDelta() / 8; // 1 "degree" = 1/8 de tour
+    if (!numDegrees.isNull()) {
+        const float steps = static_cast<float>(numDegrees.y()) / 15.f; // y: molette verticale
+        if (steps != 0.f) {
+            float d = m_camera.orbitDistance();
+            const float factor = std::pow(1.15f, -steps); // wheel up -> rapproche
+            d *= factor;
+            d = qBound(0.1f, d, 1000.f);
+            setOrbitDistance(d);
+            update();
+        }
+    }
+    event->accept();
 }
 
 // Renderer OpenGL
@@ -101,8 +127,7 @@ public:
 
     void synchronize(QQuickFramebufferObject *item) override {
         auto *glItem = qobject_cast<MyGLItem*>(item);
-        if (!glItem) return; // On protège en cas de type inattendu
-        // On pousse vers l'item les valeurs calculées lors du frame précédent (GUI thread sûr)
+        if (!glItem) return;
         const QVector3D oldPos = glItem->m_camera.position();
         glItem->m_camera.setPosition(m_camera.position());
         if (!qFuzzyCompare(oldPos.x(), glItem->m_camera.position().x()) ||
@@ -114,11 +139,13 @@ public:
         glItem->m_fps = m_fpsAccum;
         if (!qFuzzyCompare(oldFps, glItem->m_fps)) emit glItem->fpsChanged();
 
-        // On copie l'état courant de l'item côté rendu (contrôles utilisateur)
+        // Copie état utilisateur
         m_camera.setPosition(glItem->m_camera.position());
         m_camera.setSpeed(glItem->m_camera.speed());
-        m_yaw = glItem->m_yaw;
-        m_pitch = glItem->m_pitch;
+        m_camera.setOrbitDistance(glItem->m_camera.orbitDistance());
+        m_camera.setYaw(glItem->m_camera.yaw());
+        m_camera.setPitch(glItem->m_camera.pitch());
+        m_camera.setMouseSensitivity(glItem->m_camera.mouseSensitivity());
         m_input.copyFrom(glItem->m_input);
         m_grid.setResolution(glItem->m_gridResolution);
         m_drawGrid = glItem->m_drawGrid;
@@ -138,8 +165,8 @@ public:
             if (m_fpsAccum < 0.f) m_fpsAccum = instantFps; else m_fpsAccum = m_fpsAccum * 0.9f + instantFps * 0.1f;
         }
 
-        // On met à jour la caméra
-        m_camera.update(dt, m_input, m_yaw, m_pitch);
+        // Mise à jour caméra
+        m_camera.update(dt, m_input);
 
         // On prépare l'état GL
         glViewport(0, 0, framebufferObject()->width(), framebufferObject()->height());
@@ -154,8 +181,6 @@ public:
         // On crée la matrice de projection
         QMatrix4x4 proj; proj.perspective(60.f, aspect, 0.1f, 1000.f);
         proj.scale(1.f, -1.f, 1.f); // On corrige l'inversion Y du FBO
-
-        // On crée la matrice de vue
         const QMatrix4x4 view = m_camera.viewMatrix();
 
         // On charge les matrices dans la pile fixe
@@ -167,7 +192,7 @@ public:
         // On dessine la grille / axes selon les flags
         m_grid.draw(this, m_drawGrid, m_drawAxes);
 
-        update(); // On continue l'animation
+        update();
     }
 
     QOpenGLFramebufferObject *createFramebufferObject(const QSize &size) override {
@@ -181,11 +206,10 @@ private:
     InputManager m_input;
     Camera m_camera;
     Grid m_grid;
-    float m_yaw = -90.f;
-    float m_pitch = 0.f;
     bool m_drawGrid = true;
     bool m_drawAxes = true;
     float m_fpsAccum = -1.f;
+    MyGLItem *m_item = nullptr;
 };
 
 QQuickFramebufferObject::Renderer *MyGLItem::createRenderer() const { return new GLRenderer(); }
