@@ -16,11 +16,15 @@ public:
     Q_PROPERTY(float yaw READ yaw NOTIFY yawChanged)
     Q_PROPERTY(float pitch READ pitch NOTIFY pitchChanged)
     Q_PROPERTY(float fps READ fps NOTIFY fpsChanged)
-    Q_PROPERTY(float cameraSpeed READ cameraSpeed WRITE setCameraSpeed NOTIFY cameraSpeedChanged)
     Q_PROPERTY(float mouseSensitivity READ mouseSensitivity WRITE setMouseSensitivity NOTIFY mouseSensitivityChanged)
     Q_PROPERTY(bool drawGrid READ drawGrid WRITE setDrawGrid NOTIFY drawGridChanged)
     Q_PROPERTY(bool drawAxes READ drawAxes WRITE setDrawAxes NOTIFY drawAxesChanged)
+    Q_PROPERTY(float cameraSpeed READ cameraSpeed WRITE setCameraSpeed NOTIFY cameraSpeedChanged)
     Q_PROPERTY(float orbitDistance READ orbitDistance WRITE setOrbitDistance NOTIFY orbitDistanceChanged)
+    Q_PROPERTY(float cameraSpeedMin READ cameraSpeedMin CONSTANT)
+    Q_PROPERTY(float cameraSpeedMax READ cameraSpeedMax CONSTANT)
+    Q_PROPERTY(float orbitDistanceMin READ orbitDistanceMin CONSTANT)
+    Q_PROPERTY(float orbitDistanceMax READ orbitDistanceMax CONSTANT)
 
     [[nodiscard]] Renderer *createRenderer() const override;
 
@@ -35,6 +39,10 @@ public:
     bool drawGrid() const { return m_drawGrid; }
     bool drawAxes() const { return m_drawAxes; }
     float orbitDistance() const { return m_cameraController.orbitDistance(); }
+    float cameraSpeedMin() const { return m_cameraController.cameraSpeedMin(); }
+    float cameraSpeedMax() const { return m_cameraController.cameraSpeedMax(); }
+    float orbitDistanceMin() const { return m_cameraController.orbitDistanceMin(); }
+    float orbitDistanceMax() const { return m_cameraController.orbitDistanceMax(); }
 
     // Setters modifiables depuis QML
     void setCameraSpeed(float s);
@@ -50,10 +58,10 @@ signals:
     void yawChanged();
     void pitchChanged();
     void fpsChanged();
-    void cameraSpeedChanged();
     void mouseSensitivityChanged();
     void drawGridChanged();
     void drawAxesChanged();
+    void cameraSpeedChanged();
     void orbitDistanceChanged();
 
 protected:
