@@ -13,6 +13,8 @@ qt6_add_qml_module(ClayContent
         "Screen01.ui.qml"
     RESOURCES
         "images/arrow-rotate-left.svg"
+        "images/person-running.svg"
+        "images/magnifying-glass-plus.svg"
 )
 
 

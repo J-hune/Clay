@@ -21,12 +21,26 @@ Rectangle {
     color: Constants.backgroundColor
 
     Rectangle {
-        id: rightPanel
-        width: 420
-        color: "#222222"
+        id: topBar
+        height: 50
+        width: parent.width
+        color: "#1b2029"
         border.width: 0
         anchors.left: parent.left
+        anchors.right: parent.right
         anchors.top: parent.top
+        anchors.leftMargin: 0
+        anchors.rightMargin: 0
+        anchors.topMargin: 0
+    }
+
+    Rectangle {
+        id: leftBar
+        width: 420
+        color: "#242b34"
+        border.width: 0
+        anchors.left: parent.left
+        anchors.top: topBar.bottom
         anchors.bottom: parent.bottom
         anchors.leftMargin: 0
         anchors.topMargin: 0
@@ -36,7 +50,7 @@ Rectangle {
         property real initialYaw: -90
         property real initialPitch: 0
         property real initialMouseSensitivity: 0.15
-        property int initialGridResolution: 150
+        property int initialGridResolution: 50
 
         Column {
             id: controlColumn
@@ -76,7 +90,7 @@ Rectangle {
                     Button {
                         icon.height: 16; icon.width: 16
                         icon.source: "images/arrow-rotate-left.svg"
-                        onClicked: glView.mouseSensitivity = rightPanel.initialMouseSensitivity
+                        onClicked: glView.mouseSensitivity = leftBar.initialMouseSensitivity
                     }
                 }
             }
@@ -100,7 +114,7 @@ Rectangle {
                     Button {
                         icon.source: "images/arrow-rotate-left.svg"
                         icon.height: 16; icon.width: 16
-                        onClicked: glView.gridResolution = rightPanel.initialGridResolution
+                        onClicked: glView.gridResolution = leftBar.initialGridResolution
                     }
                 }
             }
@@ -129,11 +143,11 @@ Rectangle {
     }
 
     Rectangle {
-        id: leftPanel
+        id: rightBar
         border.width: 0
-        anchors.left: rightPanel.right
+        anchors.left: leftBar.right
         anchors.right: parent.right
-        anchors.top: parent.top
+        anchors.top: topBar.bottom
         anchors.bottom: parent.bottom
         anchors.leftMargin: 0
         anchors.rightMargin: 0
@@ -156,8 +170,8 @@ Rectangle {
             width: 12
             anchors.left: parent.left
             anchors.leftMargin: 8
-            anchors.topMargin: 96
-            anchors.bottomMargin: 96
+            anchors.topMargin: 128
+            anchors.bottomMargin: 128
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             radius: 4
@@ -185,8 +199,18 @@ Rectangle {
                 anchors.bottom: parent.bottom
                 height: parent.height * speedBar.ratio()
                 radius: parent.radius
-                color: "#39c5ff"
-                opacity: 0.85
+                color: "#866ab6"
+            }
+            Image {
+                id: speedImage
+                anchors.top: parent.bottom
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.topMargin: 6
+                width: 15
+                height: 15
+                opacity: 0.8
+                source: "images/person-running.svg"
+                fillMode: Image.PreserveAspectFit
             }
             Timer { id: hideTimer; interval: speedBar.timeoutMs; running: false; repeat: false; onTriggered: speedBar.visible = false }
             // Mise à jour continue
@@ -200,8 +224,8 @@ Rectangle {
             width: 12
             anchors.left: parent.left
             anchors.leftMargin: 8
-            anchors.topMargin: 96
-            anchors.bottomMargin: 96
+            anchors.topMargin: 128
+            anchors.bottomMargin: 128
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             radius: 4
@@ -228,9 +252,20 @@ Rectangle {
                 anchors.bottom: parent.bottom
                 height: parent.height * distanceBar.ratio()
                 radius: parent.radius
-                color: "#ffb347"
-                opacity: 0.85
+                color: "#BF5934"
             }
+            Image {
+                id: distanceImage
+                anchors.top: parent.bottom
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.topMargin: 6
+                width: 15
+                height: 15
+                opacity: 0.8
+                source: "images/magnifying-glass-plus.svg"
+                fillMode: Image.PreserveAspectFit
+            }
+
             Timer { id: hideTimer2; interval: distanceBar.timeoutMs; running: false; repeat: false; onTriggered: distanceBar.visible = false }
             onValueChanged: distanceFill.height = height * ratio()
         }

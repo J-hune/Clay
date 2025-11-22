@@ -89,7 +89,7 @@ private:
         m_dirty = false;
     }
 
-    int m_resolution = 100;
+    int m_resolution = 50;
     bool m_dirty = true;
     QVector<float> m_linesX; // On stocke les sommets des lignes X
     QVector<float> m_linesZ; // On stocke les sommets des lignes Z
