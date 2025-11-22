@@ -96,11 +96,13 @@ void MyGLItem::mouseReleaseEvent(QMouseEvent *event) {
 
 void MyGLItem::wheelEvent(QWheelEvent *event) {
     const float oldDist = m_cameraController.orbitDistance();
+    const float oldSpeed = m_cameraController.speed();
     m_cameraController.handleWheel(event);
-    if (!qFuzzyCompare(oldDist, m_cameraController.orbitDistance())) {
-        emit orbitDistanceChanged();
-        update();
-    }
+    const bool distChanged = !qFuzzyCompare(oldDist, m_cameraController.orbitDistance());
+    const bool speedChanged = !qFuzzyCompare(oldSpeed, m_cameraController.speed());
+    if (speedChanged) emit cameraSpeedChanged();
+    if (distChanged) emit orbitDistanceChanged();
+    if (speedChanged || distChanged) update();
 }
 
 // Renderer OpenGL

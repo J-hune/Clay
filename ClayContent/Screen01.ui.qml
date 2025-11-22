@@ -35,7 +35,6 @@ Rectangle {
         // Valeurs initiales pour les resets
         property real initialYaw: -90
         property real initialPitch: 0
-        property real initialCameraSpeed: 5.0
         property real initialMouseSensitivity: 0.15
         property int initialGridResolution: 150
 
@@ -57,30 +56,6 @@ Rectangle {
                 color: "#444"
             }
 
-            // Contrôle vitesse caméra
-            Column {
-                spacing: 2
-                Text {
-                    text: "Vitesse caméra: " + glView.cameraSpeed.toFixed(2)
-                    color: "white"
-                    font.pixelSize: 14
-                }
-                Row {
-                    spacing: 6
-                    Slider {
-                        id: speedSlider
-                        from: 0; to: 20; stepSize: 0.1
-                        value: glView.cameraSpeed
-                        onValueChanged: glView.cameraSpeed = value
-                        width: 160
-                    }
-                    Button {
-                        icon.height: 16; icon.width: 16
-                        icon.source: "images/arrow-rotate-left.svg"
-                        onClicked: glView.cameraSpeed = rightPanel.initialCameraSpeed
-                    }
-                }
-            }
             // Contrôle sensibilité souris
             Column {
                 spacing: 2
@@ -170,6 +145,94 @@ Rectangle {
             anchors.fill: parent
             focus: true
             activeFocusOnTab: true
+            onCameraSpeedChanged: {speedBar.showTemp()}
+            onOrbitDistanceChanged: {distanceBar.showTemp()}
+        }
+
+        // Barre vitesse FPS (min=plein, max=vide)
+        Rectangle {
+            id: speedBar
+            visible: false
+            width: 12
+            anchors.left: parent.left
+            anchors.leftMargin: 8
+            anchors.topMargin: 96
+            anchors.bottomMargin: 96
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            radius: 4
+            color: "#222"
+            border.width: 1
+            border.color: "#444"
+            property real value: glView.cameraSpeed
+            property real minVal: glView.cameraSpeedMin
+            property real maxVal: glView.cameraSpeedMax
+            property int timeoutMs: 2000
+            function ratio() {
+                // min -> 1, max -> 0
+                var span = maxVal - minVal;
+                if (span <= 0) return 1;
+                return (value - minVal) / span;
+            }
+            function showTemp() {
+                visible = true;
+                hideTimer.restart();
+            }
+            Rectangle {
+                id: speedFill
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: parent.height * speedBar.ratio()
+                radius: parent.radius
+                color: "#39c5ff"
+                opacity: 0.85
+            }
+            Timer { id: hideTimer; interval: speedBar.timeoutMs; running: false; repeat: false; onTriggered: speedBar.visible = false }
+            // Mise à jour continue
+            onValueChanged: speedFill.height = height * ratio()
+        }
+
+        // Barre distance orbit (min=plein, max=vide)
+        Rectangle {
+            id: distanceBar
+            visible: false
+            width: 12
+            anchors.left: parent.left
+            anchors.leftMargin: 8
+            anchors.topMargin: 96
+            anchors.bottomMargin: 96
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            radius: 4
+            color: "#222"
+            border.width: 1
+            border.color: "#444"
+            property real value: glView.orbitDistance
+            property real minVal: glView.orbitDistanceMin
+            property real maxVal: glView.orbitDistanceMax
+            property int timeoutMs: 2000
+            function ratio() {
+                var span = maxVal - minVal;
+                if (span <= 0) return 1;
+                return 1 - (value - minVal) / span;
+            }
+            function showTemp() {
+                visible = true;
+                hideTimer2.restart();
+            }
+            Rectangle {
+                id: distanceFill
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: parent.height * distanceBar.ratio()
+                radius: parent.radius
+                color: "#ffb347"
+                opacity: 0.85
+            }
+            Timer { id: hideTimer2; interval: distanceBar.timeoutMs; running: false; repeat: false; onTriggered: distanceBar.visible = false }
+            onValueChanged: distanceFill.height = height * ratio()
         }
 
         // Overlay d'information sur la caméra / rendu

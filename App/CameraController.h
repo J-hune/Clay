@@ -26,6 +26,10 @@ public:
     void setMouseSensitivity(const float s) { m_camera.setMouseSensitivity(s); }
     float orbitDistance() const { return m_camera.orbitDistance(); }
     void setOrbitDistance(const float d) { m_camera.setOrbitDistance(d); }
+    float orbitDistanceMin() const { return m_orbitDistanceMin; }
+    float orbitDistanceMax() const { return m_orbitDistanceMax; }
+    float cameraSpeedMin() const { return m_cameraSpeedMin; }
+    float cameraSpeedMax() const { return m_cameraSpeedMax; }
 
     Mode mode() const { return m_mode; }
 
@@ -112,8 +116,12 @@ public:
 
     void handleWheel(QWheelEvent *event) {
         const QPoint numDegrees = event->angleDelta() / 8; // 1 "degree" = 1/8 de tour
-        if (!numDegrees.isNull() && m_mode == Mode::Orbit) {
-            adjustOrbitDistance(numDegrees);
+        if (!numDegrees.isNull()) {
+            if (m_mode == Mode::Orbit && !m_rightButtonDown) {
+                adjustOrbitDistance(numDegrees);
+            } else if (m_mode == Mode::Fps || m_rightButtonDown) {
+                adjustFpsSpeed(numDegrees);
+            }
         }
         event->accept();
     }
@@ -167,8 +175,12 @@ private:
     // Etat de l'orbite
     bool m_wasOrbiting = false;
 
-    // Méthodes supplémentaires
+    const float m_cameraSpeedMin = 0.05f;
+    const float m_cameraSpeedMax = 200.f;
+    const float m_orbitDistanceMin = 0.1f;
+    const float m_orbitDistanceMax = 500.f;
 
+    // Méthodes supplémentaires
     void handleCursorWrap(const QPoint &localPos, const QRect &rect, const QQuickWindow *w) {
         if (localPos.y() < rect.top()) {
             QCursor::setPos(w->mapToGlobal(QPoint(localPos.x(), rect.bottom() - 1)));
@@ -204,8 +216,21 @@ private:
         float d = m_camera.orbitDistance();
         const float factor = std::pow(1.15f, -steps);
         d *= factor;
-        d = qBound(0.1f, d, 1000.f);
+        d = qBound(m_orbitDistanceMin, d, m_orbitDistanceMax);
         m_camera.setOrbitDistance(d);
+    }
+
+    void adjustFpsSpeed(const QPoint &numDegrees) {
+        // Wheel up (positive y) => augmente la vitesse
+        const float steps = static_cast<float>(numDegrees.y()) / 15.f; // 1 cran = 15°
+        if (steps == 0.f) return;
+        float s = m_camera.speed();
+        // Multiplicatif pour des variations fluides
+        const float factor = std::pow(1.15f, steps); // up => *1.15, down => /1.15
+        s *= factor;
+        // Bornes de sécurité
+        s = qBound(m_cameraSpeedMin, s, m_cameraSpeedMax);
+        m_camera.setSpeed(s);
     }
 
     void updateOrbitMode(const QVector3D &front) {
