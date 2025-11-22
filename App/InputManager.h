@@ -14,6 +14,8 @@ public:
             case Qt::Key_S: m_moveBackward = true; break;
             case Qt::Key_Q: m_moveLeft = true; break;
             case Qt::Key_D: m_moveRight = true; break;
+            case Qt::Key_E: m_moveUp = true; break;
+            case Qt::Key_A: m_moveDown = true; break;
             default: break;
         }
     }
@@ -24,6 +26,8 @@ public:
             case Qt::Key_S: m_moveBackward = false; break;
             case Qt::Key_Q: m_moveLeft = false; break;
             case Qt::Key_D: m_moveRight = false; break;
+            case Qt::Key_E: m_moveUp = false; break;
+            case Qt::Key_A: m_moveDown = false; break;
             default: break;
         }
     }
@@ -56,6 +60,8 @@ public:
     bool moveBackward() const { return m_moveBackward; }
     bool moveLeft() const { return m_moveLeft; }
     bool moveRight() const { return m_moveRight; }
+    bool moveUp() const { return m_moveUp; }
+    bool moveDown() const { return m_moveDown; }
     bool rightButtonDown() const { return m_rightButtonDown; }
 
     // On synchronise avec un autre InputManager
@@ -64,6 +70,8 @@ public:
         m_moveBackward = o.m_moveBackward;
         m_moveLeft = o.m_moveLeft;
         m_moveRight = o.m_moveRight;
+        m_moveUp = o.m_moveUp;
+        m_moveDown = o.m_moveDown;
         m_rightButtonDown = o.m_rightButtonDown;
         m_lastMousePos = o.m_lastMousePos;
     }
@@ -73,6 +81,8 @@ private:
     bool m_moveBackward = false;
     bool m_moveLeft = false;
     bool m_moveRight = false;
+    bool m_moveUp = false;
+    bool m_moveDown = false;
     bool m_rightButtonDown = false;
     QPoint m_lastMousePos;
 };
