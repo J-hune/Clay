@@ -21,7 +21,7 @@ public:
         const QVector3D right = QVector3D::crossProduct(front, QVector3D(0, 1, 0)).normalized();
         const QVector3D forwardXZ = (front - QVector3D(0, front.y(), 0)).normalized();
 
-        const float speed = 5.0f; // On applique la vitesse
+        const float speed = m_speed; // vitesse configurable
         if (input.moveForward()) m_position += forwardXZ * (speed * dt);
         if (input.moveBackward()) m_position -= forwardXZ * (speed * dt);
         if (input.moveLeft()) m_position -= right * (speed * dt);
@@ -41,9 +41,13 @@ public:
 
     const QVector3D &frontVector() const { return m_front; }
 
+    float speed() const { return m_speed; }
+    void setSpeed(const float s) { m_speed = s < 0.f ? 0.f : s; }
+
 private:
     QVector3D m_position{0.f, 1.8f, 5.f};
     QVector3D m_front{0.f, 0.f, -1.f};
+    float m_speed = 5.0f; // vitesse par défaut
 };
 
 #endif // CLAYAPP_CAMERA_H

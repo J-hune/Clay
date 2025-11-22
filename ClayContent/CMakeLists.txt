@@ -11,6 +11,8 @@ qt6_add_qml_module(ClayContent
     QML_FILES
         "App.qml"
         "Screen01.ui.qml"
+    RESOURCES
+        "images/arrow-rotate-left.svg"
 )
 
 
