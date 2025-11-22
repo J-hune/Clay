@@ -17,45 +17,50 @@ public:
 
     int resolution() const { return m_resolution; }
 
-    void draw(QOpenGLFunctions *f) {
+    // Ajout de paramètres pour activer/désactiver l'affichage
+    void draw(QOpenGLFunctions *f, const bool drawGrid, const bool drawAxes) {
         if (m_dirty) rebuildVertices();
         const int N = m_resolution;
         const float half = static_cast<float>(N);
 
         glEnableClientState(GL_VERTEX_ARRAY);
 
-        // Lignes parallèles à X
-        glColor3f(0.35f, 0.35f, 0.35f);
-        glVertexPointer(3, GL_FLOAT, 0, m_linesX.data());
-        glDrawArrays(GL_LINES, 0, m_linesX.size() / 3);
+        if (drawGrid) {
+            // Lignes parallèles à X
+            glColor3f(0.35f, 0.35f, 0.35f);
+            glVertexPointer(3, GL_FLOAT, 0, m_linesX.data());
+            glDrawArrays(GL_LINES, 0, m_linesX.size() / 3);
 
-        // Lignes parallèles à Z
-        glColor3f(0.30f, 0.30f, 0.30f);
-        glVertexPointer(3, GL_FLOAT, 0, m_linesZ.data());
-        glDrawArrays(GL_LINES, 0, m_linesZ.size() / 3);
+            // Lignes parallèles à Z
+            glColor3f(0.30f, 0.30f, 0.30f);
+            glVertexPointer(3, GL_FLOAT, 0, m_linesZ.data());
+            glDrawArrays(GL_LINES, 0, m_linesZ.size() / 3);
+        }
 
-        // Axes
-        f->glLineWidth(2.0f);
-        const GLfloat axes[] = {
-            -half, 0.0f, 0.0f, half, 0.0f, 0.0f,
-            0.0f, 0.0f, -half, 0.0f, 0.0f, half,
-            0.0f, 0.0f, 0.0f, 0.0f, 2.0f, 0.0f
-        };
-        // On dessine X
-        glColor3f(1.0f, 0.2f, 0.2f);
-        glVertexPointer(3, GL_FLOAT, 0, axes);
-        f->glDrawArrays(GL_LINES, 0, 2);
+        if (drawAxes) {
+            // Axes
+            f->glLineWidth(2.0f);
+            const GLfloat axes[] = {
+                -half, 0.0f, 0.0f, half, 0.0f, 0.0f,
+                0.0f, 0.0f, -half, 0.0f, 0.0f, half,
+                0.0f, 0.0f, 0.0f, 0.0f, 2.0f, 0.0f
+            };
+            // On dessine X
+            glColor3f(1.0f, 0.2f, 0.2f);
+            glVertexPointer(3, GL_FLOAT, 0, axes);
+            f->glDrawArrays(GL_LINES, 0, 2);
 
-        // On dessine Z
-        glColor3f(0.2f, 0.4f, 1.0f);
-        glVertexPointer(3, GL_FLOAT, 0, axes + 6);
-        f->glDrawArrays(GL_LINES, 0, 2);
+            // On dessine Z
+            glColor3f(0.2f, 0.4f, 1.0f);
+            glVertexPointer(3, GL_FLOAT, 0, axes + 6);
+            f->glDrawArrays(GL_LINES, 0, 2);
 
-        // On dessine Y
-        glColor3f(0.3f, 1.0f, 0.3f);
-        glVertexPointer(3, GL_FLOAT, 0, axes + 12);
-        f->glDrawArrays(GL_LINES, 0, 2);
-        f->glLineWidth(1.0f);
+            // On dessine Y
+            glColor3f(0.3f, 1.0f, 0.3f);
+            glVertexPointer(3, GL_FLOAT, 0, axes + 12);
+            f->glDrawArrays(GL_LINES, 0, 2);
+            f->glLineWidth(1.0f);
+        }
 
         glDisableClientState(GL_VERTEX_ARRAY);
     }

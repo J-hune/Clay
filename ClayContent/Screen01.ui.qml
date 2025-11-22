@@ -31,6 +31,126 @@ Rectangle {
         anchors.leftMargin: 0
         anchors.topMargin: 0
         anchors.bottomMargin: 0
+
+        // Valeurs initiales pour les resets
+        property real initialYaw: -90
+        property real initialPitch: 0
+        property real initialCameraSpeed: 5.0
+        property real initialMouseSensitivity: 0.15
+        property int initialGridResolution: 150
+
+        Column {
+            id: controlColumn
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 10
+
+            Text {
+                text: "Statut Rendu"
+                font.bold: true
+                font.pixelSize: 16
+                color: "white"
+            }
+            Rectangle {
+                height: 1
+                width: parent.width
+                color: "#444"
+            }
+
+            // Contrôle vitesse caméra
+            Column {
+                spacing: 2
+                Text {
+                    text: "Vitesse caméra: " + glView.cameraSpeed.toFixed(2)
+                    color: "white"
+                    font.pixelSize: 14
+                }
+                Row {
+                    spacing: 6
+                    Slider {
+                        id: speedSlider
+                        from: 0; to: 20; stepSize: 0.1
+                        value: glView.cameraSpeed
+                        onValueChanged: glView.cameraSpeed = value
+                        width: 160
+                    }
+                    Button {
+                        icon.height: 16; icon.width: 16
+                        icon.source: "images/arrow-rotate-left.svg"
+                        onClicked: glView.cameraSpeed = rightPanel.initialCameraSpeed
+                    }
+                }
+            }
+            // Contrôle sensibilité souris
+            Column {
+                spacing: 2
+                Text {
+                    text: "Sensibilité souris: " + glView.mouseSensitivity.toFixed(2)
+                    color: "white"
+                    font.pixelSize: 14
+                }
+                Row {
+                    spacing: 6
+                    Slider {
+                        id: sensSlider
+                        from: 0; to: 1; stepSize: 0.01
+                        value: glView.mouseSensitivity
+                        onValueChanged: glView.mouseSensitivity = value
+                        width: 160
+                    }
+                    Button {
+                        icon.height: 16; icon.width: 16
+                        icon.source: "images/arrow-rotate-left.svg"
+                        onClicked: glView.mouseSensitivity = rightPanel.initialMouseSensitivity
+                    }
+                }
+            }
+            // Contrôle résolution grille
+            Column {
+                spacing: 2
+                Text {
+                    text: "Résolution grille: " + glView.gridResolution
+                    color: "white"
+                    font.pixelSize: 14
+                }
+                Row {
+                    spacing: 8
+                    Slider {
+                        id: gridSlider
+                        from: 1; to: 500; stepSize: 1
+                        value: glView.gridResolution
+                        onValueChanged: glView.gridResolution = Math.round(value)
+                        width: 140
+                    }
+                    Button {
+                        icon.source: "images/arrow-rotate-left.svg"
+                        icon.height: 16; icon.width: 16
+                        onClicked: glView.gridResolution = rightPanel.initialGridResolution
+                    }
+                }
+            }
+            Row {
+                // Switch grille / axes
+                spacing: 24
+                Switch {
+                    id: gridSwitch
+                    text: "Grille"
+                    checked: glView.drawGrid
+                    onToggled: { glView.drawGrid = checked; glView.update(); }
+                }
+                Switch {
+                    id: axesSwitch
+                    text: "Axes"
+                    checked: glView.drawAxes
+                    onToggled: { glView.drawAxes = checked; glView.update(); }
+                }
+            }
+            Rectangle {
+                height: 1
+                width: parent.width
+                color: "#444"
+            }
+        }
     }
 
     Rectangle {
@@ -46,10 +166,48 @@ Rectangle {
         anchors.bottomMargin: 0
 
         MyGLItem {
+            id: glView
             anchors.fill: parent
             focus: true
             activeFocusOnTab: true
-            gridResolution: 150 // résolution du terrain (demi-étendue en lignes)
+        }
+
+        // Overlay d'information sur la caméra / rendu
+        Rectangle {
+            id: debugOverlay
+            z: 10
+            width: 240
+            color: "#00000088"
+            radius: 6
+            border.width: 1
+            border.color: "#444"
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.leftMargin: 8
+            anchors.topMargin: 8
+
+            Column {
+                id: infoColumn
+                spacing: 4
+                anchors.left: parent.left
+                anchors.right: parent.right
+
+                Text {
+                    text: "FPS: " + (glView.fps > 0 ? glView.fps.toFixed(1) : "--")
+                    color: "white"
+                    font.pixelSize: 14
+                }
+                Text {
+                    text: "Pos: " + glView.cameraPosition.x.toFixed(1) + ", " + glView.cameraPosition.y.toFixed(1) + ", " + glView.cameraPosition.z.toFixed(1)
+                    color: "white"
+                    font.pixelSize: 14
+                }
+                Text {
+                    text: "Yaw: " + glView.yaw.toFixed(1) + "  Pitch: " + glView.pitch.toFixed(1)
+                    color: "white"
+                    font.pixelSize: 14
+                }
+            }
         }
     }
 }
