@@ -3,8 +3,7 @@
 
 #include <QQuickFramebufferObject>
 #include <QVector3D>
-#include "InputManager.h"
-#include "Camera.h"
+#include "CameraController.h"
 
 class MyGLItem : public QQuickFramebufferObject {
     Q_OBJECT
@@ -26,16 +25,16 @@ public:
     [[nodiscard]] Renderer *createRenderer() const override;
 
     // Getters accessibles depuis QML
-    QVector3D cameraPosition() const { return m_camera.position(); }
-    float yaw() const { return m_camera.yaw(); }
-    float pitch() const { return m_camera.pitch(); }
+    QVector3D cameraPosition() const { return m_cameraController.camera().position(); }
+    float yaw() const { return m_cameraController.camera().yaw(); }
+    float pitch() const { return m_cameraController.camera().pitch(); }
     float fps() const { return m_fps; }
-    float cameraSpeed() const { return m_camera.speed(); }
-    float mouseSensitivity() const { return m_camera.mouseSensitivity(); }
+    float cameraSpeed() const { return m_cameraController.speed(); }
+    float mouseSensitivity() const { return m_cameraController.mouseSensitivity(); }
     int gridResolution() const { return m_gridResolution; }
     bool drawGrid() const { return m_drawGrid; }
     bool drawAxes() const { return m_drawAxes; }
-    float orbitDistance() const { return m_camera.orbitDistance(); }
+    float orbitDistance() const { return m_cameraController.orbitDistance(); }
 
     // Setters modifiables depuis QML
     void setCameraSpeed(float s);
@@ -67,8 +66,7 @@ protected:
 
 private:
     friend class GLRenderer;
-    InputManager m_input;
-    Camera m_camera;
+    CameraController m_cameraController;
     int m_gridResolution = 100;
     float m_fps = 0.f;
     bool m_drawGrid = true;
