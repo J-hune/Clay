@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 3.21.1)
 
 option(LINK_INSIGHT "Link Qt Insight Tracker library" ON)
@@ -25,7 +24,7 @@ qt_standard_project_setup()
 # ------------------------------------------------------
 file(GLOB_RECURSE PROJECT_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/App/*.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}App/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/App/*.h"
 )
 
 qt_add_executable(${CMAKE_PROJECT_NAME} ${PROJECT_SOURCES})

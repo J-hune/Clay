@@ -2,8 +2,14 @@ import QtQuick
 import Clay
 
 Window {
-    width: mainScreen.width
-    height: mainScreen.height
+    // On récupère la taille de l'écran et on ouvre l'application à un scale 0.6 x Taille écran
+    property real screenW: Screen.width
+    property real screenH: Screen.height
+
+    property real scaleFactor: 0.6
+
+    width: Math.round(screenW * scaleFactor)
+    height: Math.round(screenH * scaleFactor)
 
     visible: true
     title: "Clay"
@@ -11,6 +17,4 @@ Window {
     Screen01 {
         id: mainScreen
     }
-
 }
-

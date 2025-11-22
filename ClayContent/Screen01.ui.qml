@@ -14,8 +14,9 @@ import MyGL 1.0
 
 Rectangle {
     id: rectangle
-    width: Constants.width
-    height: Constants.height
+    anchors.fill: parent
+    implicitWidth: Constants.width
+    implicitHeight: Constants.height
 
     color: Constants.backgroundColor
 
@@ -46,6 +47,9 @@ Rectangle {
 
         MyGLItem {
             anchors.fill: parent
+            focus: true
+            activeFocusOnTab: true
+            gridResolution: 150 // résolution du terrain (demi-étendue en lignes)
         }
     }
 }
