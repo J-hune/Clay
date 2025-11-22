@@ -4,6 +4,7 @@
 #include <QQuickFramebufferObject>
 #include <QVector3D>
 #include "CameraController.h"
+#include "Grid.h"
 
 class MyGLItem : public QQuickFramebufferObject {
     Q_OBJECT
@@ -35,7 +36,7 @@ public:
     float fps() const { return m_fps; }
     float cameraSpeed() const { return m_cameraController.speed(); }
     float mouseSensitivity() const { return m_cameraController.mouseSensitivity(); }
-    int gridResolution() const { return m_gridResolution; }
+    int gridResolution() const { return m_grid.resolution(); }
     bool drawGrid() const { return m_drawGrid; }
     bool drawAxes() const { return m_drawAxes; }
     float orbitDistance() const { return m_cameraController.orbitDistance(); }
@@ -75,7 +76,7 @@ protected:
 private:
     friend class GLRenderer;
     CameraController m_cameraController;
-    int m_gridResolution = 100;
+    Grid m_grid;
     float m_fps = 0.f;
     bool m_drawGrid = true;
     bool m_drawAxes = true;

@@ -22,11 +22,12 @@ MyGLItem::MyGLItem(QQuickItem *parent) : QQuickFramebufferObject(parent) {
 }
 
 void MyGLItem::setGridResolution(int r) {
-    r = qBound(1, r, 10000);
-    if (m_gridResolution == r) return;
-    m_gridResolution = r;
-    emit gridResolutionChanged();
-    update();
+    const int old = m_grid.resolution();
+    m_grid.setResolution(r);
+    if (m_grid.resolution() != old) {
+        emit gridResolutionChanged();
+        update();
+    }
 }
 
 void MyGLItem::setCameraSpeed(const float s) {
@@ -133,7 +134,7 @@ public:
         m_cameraController.camera().setPitch(glItem->m_cameraController.camera().pitch());
         m_cameraController.camera().setMouseSensitivity(glItem->m_cameraController.camera().mouseSensitivity());
         m_cameraController.copyInputFrom(glItem->m_cameraController);
-        m_grid.setResolution(glItem->m_gridResolution);
+        m_grid.setResolution(glItem->m_grid.resolution());
         m_drawGrid = glItem->m_drawGrid;
         m_drawAxes = glItem->m_drawAxes;
     }
