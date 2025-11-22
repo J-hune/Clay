@@ -19,13 +19,18 @@ public:
         );
         front.normalize();
         const QVector3D right = QVector3D::crossProduct(front, QVector3D(0, 1, 0)).normalized();
-        const QVector3D forwardXZ = (front - QVector3D(0, front.y(), 0)).normalized();
 
         const float speed = m_speed; // vitesse configurable
-        if (input.moveForward()) m_position += forwardXZ * (speed * dt);
-        if (input.moveBackward()) m_position -= forwardXZ * (speed * dt);
+
+        // Avant / arrière: direction complète (inclut Y) => changement de hauteur selon pitch
+        if (input.moveForward()) m_position += front * (speed * dt);
+        if (input.moveBackward()) m_position -= front * (speed * dt);
         if (input.moveLeft()) m_position -= right * (speed * dt);
         if (input.moveRight()) m_position += right * (speed * dt);
+
+        // Montée / descente (E/A) sur axe Y
+        if (input.moveUp()) m_position.setY(m_position.y() + speed * dt);
+        if (input.moveDown()) m_position.setY(m_position.y() - speed * dt);
 
         m_front = front;
     }
