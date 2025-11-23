@@ -1,10 +1,11 @@
 #ifndef CLAYAPP_MYGLITEM_H
 #define CLAYAPP_MYGLITEM_H
 
-#include <QQuickFramebufferObject>
-#include <QVector3D>
 #include "CameraController.h"
 #include "Grid.h"
+#include "TerrainMesh.h"
+#include <QQuickFramebufferObject>
+#include <QVector3D>
 
 class MyGLItem : public QQuickFramebufferObject {
     Q_OBJECT
@@ -26,6 +27,12 @@ public:
     Q_PROPERTY(float cameraSpeedMax READ cameraSpeedMax CONSTANT)
     Q_PROPERTY(float orbitDistanceMin READ orbitDistanceMin CONSTANT)
     Q_PROPERTY(float orbitDistanceMax READ orbitDistanceMax CONSTANT)
+    Q_PROPERTY(int terrainResolution READ terrainResolution WRITE setTerrainResolution NOTIFY terrainResolutionChanged)
+    Q_PROPERTY(int heightmapResolution READ heightmapResolution WRITE setHeightmapResolution NOTIFY heightmapResolutionChanged)
+    Q_PROPERTY(bool terrainReady READ terrainReady NOTIFY terrainReadyChanged)
+    Q_PROPERTY(QUrl heightmapSource READ heightmapSource WRITE setHeightmapSource NOTIFY heightmapSourceChanged)
+    Q_PROPERTY(float heightScale READ heightScale WRITE setHeightScale NOTIFY heightScaleChanged)
+    Q_PROPERTY(int terrainMode READ terrainMode WRITE setTerrainMode NOTIFY terrainModeChanged) // 0=Flat 1=Heightmap
 
     [[nodiscard]] Renderer *createRenderer() const override;
 
@@ -44,6 +51,12 @@ public:
     float cameraSpeedMax() const { return m_cameraController.cameraSpeedMax(); }
     float orbitDistanceMin() const { return m_cameraController.orbitDistanceMin(); }
     float orbitDistanceMax() const { return m_cameraController.orbitDistanceMax(); }
+    int terrainResolution() const { return m_terrainResolution; }
+    int heightmapResolution() const { return m_heightmapResolution; }
+    bool terrainReady() const { return m_terrainReady; }
+    QUrl heightmapSource() const { return m_heightmapSource; }
+    float heightScale() const { return m_heightScale; }
+    int terrainMode() const { return m_terrainMode; }
 
     // Setters modifiables depuis QML
     void setCameraSpeed(float s);
@@ -52,6 +65,12 @@ public:
     void setDrawGrid(bool v);
     void setDrawAxes(bool v);
     void setOrbitDistance(float d);
+    void setTerrainResolution(int r);
+    void setHeightmapResolution(int r);
+    void setHeightmapSource(const QUrl &url);
+    void setHeightScale(float s);
+    void setTerrainMode(int m);
+    Q_INVOKABLE void generateTerrain();
 
 signals:
     void gridResolutionChanged();
@@ -64,6 +83,12 @@ signals:
     void drawAxesChanged();
     void cameraSpeedChanged();
     void orbitDistanceChanged();
+    void terrainResolutionChanged();
+    void terrainReadyChanged();
+    void heightmapSourceChanged();
+    void heightScaleChanged();
+    void terrainModeChanged();
+    void heightmapResolutionChanged();
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -80,6 +105,17 @@ private:
     float m_fps = 0.f;
     bool m_drawGrid = true;
     bool m_drawAxes = true;
+
+    // Terrain
+    TerrainMesh m_terrainMesh; // maillage actuel
+    int m_terrainResolution = 256; // densité (X=Z)
+    bool m_terrainReady = false;
+    int m_terrainRevision = 0; // incrémenté à chaque génération pour forcer re-upload
+    QUrl m_heightmapSource; // source image
+    float m_heightScale = 30.f;
+    int m_terrainMode = 0; // 0 flat, 1 heightmap
+    int m_heightmapResolution = 512; // texture heightmap
+    bool m_userRequestedTerrain = false; // aucune génération avant action utilisateur
 };
 
 #endif // CLAYAPP_MYGLITEM_H

@@ -27,12 +27,12 @@ public:
 
         if (drawGrid) {
             // Lignes parallèles à X
-            glColor3f(0.35f, 0.35f, 0.35f);
+            glColor3f(0.25f, 0.26f, 0.28f);
             glVertexPointer(3, GL_FLOAT, 0, m_linesX.data());
             glDrawArrays(GL_LINES, 0, m_linesX.size() / 3);
 
             // Lignes parallèles à Z
-            glColor3f(0.30f, 0.30f, 0.30f);
+            glColor3f(0.25f, 0.26f, 0.28f);
             glVertexPointer(3, GL_FLOAT, 0, m_linesZ.data());
             glDrawArrays(GL_LINES, 0, m_linesZ.size() / 3);
         }
