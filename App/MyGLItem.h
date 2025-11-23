@@ -3,6 +3,8 @@
 
 #include <QQuickFramebufferObject>
 #include <QVector3D>
+
+#include "BrushManager.h"
 #include "CameraController.h"
 
 class MyGLItem : public QQuickFramebufferObject {
@@ -25,6 +27,9 @@ public:
     Q_PROPERTY(float cameraSpeedMax READ cameraSpeedMax CONSTANT)
     Q_PROPERTY(float orbitDistanceMin READ orbitDistanceMin CONSTANT)
     Q_PROPERTY(float orbitDistanceMax READ orbitDistanceMax CONSTANT)
+    Q_PROPERTY(QString selectedBrush READ selectedBrush WRITE setSelectedBrush NOTIFY selectedBrushChanged)
+    Q_PROPERTY(float brushSize READ brushSize WRITE setBrushSize NOTIFY brushSizeChanged)
+    Q_PROPERTY(float brushStrength READ brushStrength WRITE setBrushStrength NOTIFY brushStrengthChanged)
 
     [[nodiscard]] Renderer *createRenderer() const override;
 
@@ -43,6 +48,10 @@ public:
     float cameraSpeedMax() const { return m_cameraController.cameraSpeedMax(); }
     float orbitDistanceMin() const { return m_cameraController.orbitDistanceMin(); }
     float orbitDistanceMax() const { return m_cameraController.orbitDistanceMax(); }
+    QString selectedBrush() const { return m_brushManager.selectedBrush(); }
+    float brushSize() const { return m_brushManager.brushSize(); }
+    float brushStrength() const { return m_brushManager.brushStrength(); }
+
 
     // Setters modifiables depuis QML
     void setCameraSpeed(float s);
@@ -51,6 +60,9 @@ public:
     void setDrawGrid(bool v);
     void setDrawAxes(bool v);
     void setOrbitDistance(float d);
+    void setBrushSize(float s);
+    void setBrushStrength(float s);
+    void setSelectedBrush(const QString &p);
 
 signals:
     void gridResolutionChanged();
@@ -63,6 +75,9 @@ signals:
     void drawAxesChanged();
     void cameraSpeedChanged();
     void orbitDistanceChanged();
+    void selectedBrushChanged();
+    void brushSizeChanged();
+    void brushStrengthChanged();
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -71,6 +86,9 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
+    void hoverMoveEvent(QHoverEvent *event) override;
+    void hoverEnterEvent(QHoverEvent *event) override;
+    void hoverLeaveEvent(QHoverEvent *event) override;
 
 private:
     friend class GLRenderer;
@@ -79,6 +97,7 @@ private:
     float m_fps = 0.f;
     bool m_drawGrid = true;
     bool m_drawAxes = true;
+    BrushManager m_brushManager = BrushManager(this);
 };
 
 #endif // CLAYAPP_MYGLITEM_H

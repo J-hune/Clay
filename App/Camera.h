@@ -24,8 +24,8 @@ public:
     float orbitDistance() const { return m_orbitDistance; }
 
     void setPosition(const QVector3D &p) { m_position = p; }
-    void setYaw(const float y) { m_yaw = y; }
-    void setPitch(const float p) { m_pitch = qBound(-89.f, p, 89.f); }
+    void setYaw(const float y) { m_yaw = y; recomputeFront(); }
+    void setPitch(const float p) { m_pitch = qBound(-89.f, p, 89.f); recomputeFront();}
     void setSpeed(const float s) { m_speed = s < 0.f ? 0.f : s; }
     void setMouseSensitivity(const float s) { m_mouseSensitivity = s < 0.f ? 0.f : s; }
     void setOrbitPivot(const QVector3D &p) { m_orbitPivot = p; }

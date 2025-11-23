@@ -65,11 +65,23 @@ public:
         glDisableClientState(GL_VERTEX_ARRAY);
     }
 
+    // Vérifie si une position (x,z) est dans la grille
+    bool contains(float x, float z) const {
+        const float half = static_cast<float>(m_resolution) * m_step;
+        return (x >= -half && x <= half && z >= -half && z <= half);
+    }
+
+    // Par défaut planaire à 0.0f. Si présence d'une heightmap, on pourrait ajuster.
+    float heightAt(float /*x*/, float /*z*/) const {
+        return 0.0f;
+    }
+
 private:
     void rebuildVertices() {
         // On reconstruit les deux ensembles de lignes
         const int N = m_resolution;
         constexpr float step = 1.0f;
+        m_step = step;
         const int lineCount = 2 * N + 1;
 
         m_linesX.clear(); m_linesX.reserve(lineCount * 6);
@@ -93,6 +105,8 @@ private:
     bool m_dirty = true;
     QVector<float> m_linesX; // On stocke les sommets des lignes X
     QVector<float> m_linesZ; // On stocke les sommets des lignes Z
+    // step (distance entre lignes)
+    float m_step = 1.0f;
 };
 
 #endif // CLAYAPP_GRID_H
