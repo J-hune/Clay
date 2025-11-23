@@ -6,12 +6,19 @@ Check out https://doc.qt.io/qtcreator/creator-quick-ui-forms.html for details on
 */
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import Clay
 
 // Pour ouvrir le projet sur Qt Design Studio, il faut commenter l'import suivant
 // (oui c'est un peu con, mais bon...)
 import MyGL 1.0
 
+// Couleurs
+// Barre gauche : #272a2f
+// Barre du haut et droite : #212429
+// Switch accent : #bf5934
+// Barre vitesse FPS : #866ab6
+// Barre distance orbit : #BF5934
 Rectangle {
     id: rectangle
     anchors.fill: parent
@@ -21,26 +28,12 @@ Rectangle {
     color: Constants.backgroundColor
 
     Rectangle {
-        id: topBar
-        height: 50
-        width: parent.width
-        color: "#1b2029"
-        border.width: 0
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.leftMargin: 0
-        anchors.rightMargin: 0
-        anchors.topMargin: 0
-    }
-
-    Rectangle {
         id: leftBar
         width: 420
-        color: "#242b34"
+        color: "#272a2f"
         border.width: 0
         anchors.left: parent.left
-        anchors.top: topBar.bottom
+        anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.leftMargin: 0
         anchors.topMargin: 0
@@ -60,14 +53,13 @@ Rectangle {
 
             Text {
                 text: "Statut Rendu"
-                font.bold: true
-                font.pixelSize: 16
+                font.pixelSize: 18
                 color: "white"
             }
             Rectangle {
-                height: 1
+                height: 2
                 width: parent.width
-                color: "#444"
+                color: "#2c2f34"
             }
 
             // Contrôle sensibilité souris
@@ -125,12 +117,14 @@ Rectangle {
                     id: gridSwitch
                     text: "Grille"
                     checked: glView.drawGrid
+                    Material.accent: "#bf5934"
                     onToggled: { glView.drawGrid = checked; glView.update(); }
                 }
                 Switch {
                     id: axesSwitch
                     text: "Axes"
                     checked: glView.drawAxes
+                    Material.accent: "#bf5934"
                     onToggled: { glView.drawAxes = checked; glView.update(); }
                 }
             }
@@ -139,6 +133,108 @@ Rectangle {
                 width: parent.width
                 color: "#444"
             }
+
+            // Densité terrain & résolution heightmap
+            Column {
+                spacing: 4
+                Text { text: "Résolution terrain (densité): " + glView.terrainResolution; color: "white"; font.pixelSize: 14 }
+                Slider {
+                    from: 2; to: 1024; stepSize: 1
+                    value: glView.terrainResolution
+                    width: 260
+                    onValueChanged: glView.terrainResolution = Math.round(value);
+                    onPressedChanged: if (!pressed) glView.generateTerrain()
+                }
+                Text { text: "Résolution heightmap: " + glView.heightmapResolution; color: "white"; font.pixelSize: 14 }
+                ComboBox { model: [512,1024,2048,4096]; currentIndex: model.indexOf(glView.heightmapResolution); onActivated: glView.heightmapResolution = parseInt(currentText); width: 140 }
+            }
+        }
+    }
+
+    Rectangle {
+        id: topBar
+        height: 54
+        color: "#212429"
+        border.width: 0
+        anchors.left: leftBar.right
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.leftMargin: 0
+        anchors.rightMargin: 0
+        anchors.topMargin: 0
+
+        Row {
+            id: topRow
+            anchors.fill: parent
+            anchors.margins: 8
+            spacing: 12
+
+            Button {
+                id: terrainButton
+                text: "Terrain"
+                icon.source: "images/layer-plus.svg"
+                icon.width: 16; icon.height: 16
+                icon.color: "white"
+                onClicked: terrainPopup.open()
+            }
+        }
+
+        Popup {
+            id: terrainPopup
+            x: terrainButton.x
+            y: topBar.height
+            width: 300
+            modal: false
+            focus: true
+            padding: 12
+            contentItem: Column {
+                spacing: 8
+                Text { text: "Génération Terrain"; font.pixelSize: 16; color: "white" }
+                Rectangle { height: 1; width: parent.width; color: "#333" }
+                Row {
+                    spacing: 6
+                    Text { text: "Mode:"; color: "white" }
+                    ComboBox {
+                        id: modeCombo
+                        model: ["Plat", "Heightmap"]
+                        currentIndex: glView.terrainMode
+                        onCurrentIndexChanged: glView.terrainMode = currentIndex
+                        width: 120
+                    }
+                }
+                Row {
+                    spacing: 6
+                    Text { text: "HeightScale:"; color: "white" }
+                    Slider {
+                        id: heightScaleSlider
+                        from: 0; to: 200; stepSize: 1
+                        value: glView.heightScale
+                        onValueChanged: glView.heightScale = value
+                        width: 120
+                    }
+                    Text { text: Math.round(glView.heightScale); color: "#ccc" }
+                }
+                Row {
+                    spacing: 6
+                    visible: glView.terrainMode === 1
+                    Button { text: "Image..."; onClicked: fileDialog.open() }
+                    Text { text: glView.heightmapSource.toString().length > 0 ? glView.heightmapSource.toString().split('/').pop() : "(Aucune)"; color: "#ccc"; elide: Text.ElideRight; width: 110 }
+                }
+                FileDialog {
+                    id: fileDialog
+                    title: "Choisir une image heightmap"
+                    onAccepted: {
+                        glView.heightmapSource = fileDialog.selectedFile
+                    }
+                }
+                Button {
+                    text: glView.terrainReady ? "Régénérer" : "Générer"
+                    onClicked: glView.generateTerrain()
+                }
+                Text { text: glView.terrainReady ? ("Triangles: " + ( (glView.terrainResolution-1)*(glView.terrainResolution-1)*2)) : "Terrain non prêt"; color: "#ccc"; font.pixelSize: 12 }
+                Button { text: "Fermer"; onClicked: terrainPopup.close() }
+            }
+            background: Rectangle { radius: 6; color: "#212429"; border.color: "#444"; border.width: 1 }
         }
     }
 

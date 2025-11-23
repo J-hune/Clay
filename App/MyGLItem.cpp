@@ -1,6 +1,8 @@
 #include "MyGLItem.h"
 #include "Grid.h"
 #include "CameraController.h"
+#include "TerrainMesh.h"
+#include "TerrainGpu.h"
 #include <QOpenGLFunctions>
 #include <QOpenGLFramebufferObjectFormat>
 #include <QMatrix4x4>
@@ -9,9 +11,29 @@
 #include <QtGlobal>
 #include <QQuickWindow>
 #include <cmath>
+#include <iostream>
+#include <QImageReader>
+#include <QFileInfo>
 
-// QMatrix4x4 vers float*
-static const float *toPtr(const QMatrix4x4 &m) { return m.constData(); }
+static QImage loadHeightImage(const QUrl &url) {
+    const QString path = url.isLocalFile() ? url.toLocalFile() : url.toString();
+    QImage img;
+    QImageReader reader(path);
+    const QString suffix = QFileInfo(path).suffix().toLower();
+    std::cout << "Loading heightmap image from: " << path.toStdString() << " (suffix: " << suffix.toStdString() << ")" << std::endl;
+    if (suffix == QLatin1String("exr")) reader.setFormat("exr");
+    if (reader.canRead()) {
+        reader.setAutoTransform(true);
+        img = reader.read();
+        if (!img.isNull()) return img;
+    } else {
+        std::cout << "Impossible de lire l'image: " << reader.errorString().toStdString() << std::endl;
+        // TODO faire une alerte image + implémenter EXR
+    }
+    // Fallback simple
+    img.load(path);
+    return img;
+}
 
 MyGLItem::MyGLItem(QQuickItem *parent) : QQuickFramebufferObject(parent) {
     setAcceptedMouseButtons(Qt::AllButtons);
@@ -57,6 +79,58 @@ void MyGLItem::setOrbitDistance(const float d) {
     const float old = m_cameraController.orbitDistance();
     m_cameraController.setOrbitDistance(d);
     if (!qFuzzyCompare(old, m_cameraController.orbitDistance())) emit orbitDistanceChanged();
+}
+
+
+void MyGLItem::setTerrainResolution(int r) {
+    if (r < 2) r = 2;
+    if (r == m_terrainResolution) return;
+    m_terrainResolution = r;
+    emit terrainResolutionChanged();
+}
+void MyGLItem::setHeightmapResolution(int r) {
+    constexpr int allowed[4] = {512, 1024, 2048, 4096};
+    int chosen = 512;
+    for (const int v : allowed) if (r == v) { chosen = v; break; }
+    if (chosen == m_heightmapResolution) return;
+    m_heightmapResolution = chosen;
+    ++m_terrainRevision; // rebuild GPU texture
+    emit heightmapResolutionChanged();
+    update();
+}
+
+void MyGLItem::setHeightmapSource(const QUrl &url) {
+    if (url == m_heightmapSource) return;
+    m_heightmapSource = url;
+    emit heightmapSourceChanged();
+}
+void MyGLItem::setHeightScale(float s) {
+    if (s < 0.f) s = 0.f;
+    if (qFuzzyCompare(s, m_heightScale)) return;
+    m_heightScale = s;
+    emit heightScaleChanged();
+}
+void MyGLItem::setTerrainMode(int m) {
+    if (m == m_terrainMode) return;
+    if (m < 0 || m > 1) return; // limitation actuelle
+    m_terrainMode = m;
+    emit terrainModeChanged();
+}
+
+void MyGLItem::generateTerrain() {
+    m_userRequestedTerrain = true;
+    m_terrainReady = false;
+    const int res = m_terrainResolution;
+    if (m_terrainMode == 0) { // flat
+        m_terrainMesh.buildFlat(res, res);
+    } else if (m_terrainMode == 1) { // heightmap
+        const QImage img = loadHeightImage(m_heightmapSource);
+        if (!img.isNull()) m_terrainMesh.buildHeightmap(img, res, res, m_heightScale); else m_terrainMesh.buildFlat(res, res);
+    }
+    m_terrainReady = m_terrainMesh.isValid();
+    ++m_terrainRevision;
+    emit terrainReadyChanged();
+    update();
 }
 
 void MyGLItem::keyPressEvent(QKeyEvent *event) {
@@ -109,11 +183,16 @@ void MyGLItem::wheelEvent(QWheelEvent *event) {
 // Renderer OpenGL
 class GLRenderer : public QQuickFramebufferObject::Renderer, protected QOpenGLFunctions {
 public:
-    GLRenderer() { initializeOpenGLFunctions(); m_timer.start(); }
+    GLRenderer() {
+        initializeOpenGLFunctions();
+        m_timer.start();
+        m_terrainGpu.initialize(this);
+    }
 
     void synchronize(QQuickFramebufferObject *item) override {
         auto *glItem = qobject_cast<MyGLItem*>(item);
         if (!glItem) return;
+        // Synchronisation caméra / stats
         const QVector3D oldPos = glItem->m_cameraController.camera().position();
         glItem->m_cameraController.camera().setPosition(m_cameraController.camera().position());
         if (!qFuzzyCompare(oldPos.x(), glItem->m_cameraController.camera().position().x()) ||
@@ -137,6 +216,21 @@ public:
         m_grid.setResolution(glItem->m_grid.resolution());
         m_drawGrid = glItem->m_drawGrid;
         m_drawAxes = glItem->m_drawAxes;
+
+        // Gestion révision terrain
+        if (glItem->m_userRequestedTerrain && glItem->m_terrainRevision != m_lastTerrainRevision) {
+            m_lastTerrainRevision = glItem->m_terrainRevision;
+            m_terrainGpu.setGridResolution(glItem->m_terrainResolution, glItem->m_terrainResolution);
+            m_terrainGpu.setTextureResolution(glItem->m_heightmapResolution);
+            if (glItem->m_terrainMode == 1 && !glItem->m_heightmapSource.isEmpty()) {
+                const QImage img = loadHeightImage(glItem->m_heightmapSource);
+                if (!img.isNull())m_terrainGpu.rebuild(this, img, glItem->m_heightScale);
+                else m_terrainGpu.rebuildFlat(this, glItem->m_heightScale);
+            } else {
+                m_terrainGpu.rebuildFlat(this, glItem->m_heightScale);
+            }
+            m_terrainReady = true;
+        }
     }
 
     void render() override {
@@ -158,7 +252,7 @@ public:
         // On prépare l'état GL
         glViewport(0, 0, framebufferObject()->width(), framebufferObject()->height());
         glEnable(GL_DEPTH_TEST);
-        glClearColor(0.12f, 0.12f, 0.12f, 1);
+        glClearColor(0.129f, 0.141f, 0.161f, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         const int w = framebufferObject()->width();
@@ -171,13 +265,16 @@ public:
         const QMatrix4x4 view = m_cameraController.camera().viewMatrix();
 
         // On charge les matrices dans la pile fixe
-        glMatrixMode(GL_PROJECTION);
-        glLoadMatrixf(toPtr(proj));
-        glMatrixMode(GL_MODELVIEW);
-        glLoadMatrixf(toPtr(view));
+        glMatrixMode(GL_PROJECTION); glLoadMatrixf(proj.constData());
+        glMatrixMode(GL_MODELVIEW); glLoadMatrixf(view.constData());
 
         // On dessine la grille / axes selon les flags
         m_grid.draw(this, m_drawGrid, m_drawAxes);
+
+        // Terrain shaderisé
+        if (m_terrainReady) {
+            m_terrainGpu.draw(this, proj, view);
+        }
 
         update();
     }
@@ -195,7 +292,9 @@ private:
     bool m_drawGrid = true;
     bool m_drawAxes = true;
     float m_fpsAccum = -1.f;
-    MyGLItem *m_item = nullptr;
+    TerrainGpu m_terrainGpu;
+    bool m_terrainReady = false;
+    int m_lastTerrainRevision = -1;
 };
 
 QQuickFramebufferObject::Renderer *MyGLItem::createRenderer() const { return new GLRenderer(); }
