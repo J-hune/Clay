@@ -30,6 +30,12 @@ public:
     float orbitDistanceMax() const { return m_orbitDistanceMax; }
     float cameraSpeedMin() const { return m_cameraSpeedMin; }
     float cameraSpeedMax() const { return m_cameraSpeedMax; }
+    QPoint lastMousePosition() const { return m_lastMousePos; }
+    void setMousePosition(const QPoint &pos) {
+        m_lastMousePos = pos;
+        const QPoint delta = pos - m_lastMousePos;
+        m_mouseDelta = delta;
+    }
 
     Mode mode() const { return m_mode; }
 
@@ -128,7 +134,6 @@ public:
 
     // Mise à jour de la caméra (en fonction du temps)
     void update(const float dt) {
-        m_camera.recomputeFront();
         const QVector3D front = m_camera.frontVector();
 
         // Mode Orbit (drag actif)

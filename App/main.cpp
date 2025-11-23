@@ -1,6 +1,8 @@
 #include <QApplication>
 #include <QQmlApplicationEngine>
+#include <qqmlcontext.h>
 
+#include "BrushManager.h"
 #include "MyGLItem.h"
 #include "autogen/environment.h"
 
@@ -10,6 +12,9 @@ int main(int argc, char *argv[]) {
 
     qmlRegisterType<MyGLItem>("MyGL", 1, 0, "MyGLItem");
 
+
+    BrushManager *brushLib = new BrushManager(&app);
+
     QQmlApplicationEngine engine;
     const QUrl url(mainQmlFile);
     QObject::connect(
@@ -18,7 +23,7 @@ int main(int argc, char *argv[]) {
             if (!obj && url == objUrl)
                 QCoreApplication::exit(-1);
         }, Qt::QueuedConnection);
-
+    engine.rootContext()->setContextProperty("BrushLib", brushLib);
     engine.addImportPath(QCoreApplication::applicationDirPath() + "/qml");
     engine.addImportPath(":/");
     engine.load(url);

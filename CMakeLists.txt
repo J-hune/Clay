@@ -28,6 +28,14 @@ file(GLOB_RECURSE PROJECT_SOURCES
 )
 
 qt_add_executable(${CMAKE_PROJECT_NAME} ${PROJECT_SOURCES})
+
+# Copie le dossier App/brushes dans le dossier où se situe l'exécutable après build
+add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/App/brushes"
+        "$<TARGET_FILE_DIR:${CMAKE_PROJECT_NAME}>/brushes"
+)
+
 qt_add_resources(${CMAKE_PROJECT_NAME} "configuration"
     PREFIX "/"
     FILES
@@ -49,3 +57,4 @@ install(TARGETS ${CMAKE_PROJECT_NAME}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/App/brushes DESTINATION ${CMAKE_INSTALL_DATADIR}/${CMAKE_PROJECT_NAME})

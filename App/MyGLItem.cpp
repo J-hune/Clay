@@ -58,6 +58,30 @@ void MyGLItem::setOrbitDistance(const float d) {
     if (!qFuzzyCompare(old, m_cameraController.orbitDistance())) emit orbitDistanceChanged();
 }
 
+void MyGLItem::setSelectedBrush(const QString &p) {
+    if (m_brushManager.selectedBrush() == p) return;
+    m_brushManager.loadBrushTexture(p);
+    emit selectedBrushChanged();
+    update();
+}
+
+void MyGLItem::setBrushSize(float s) {
+    if (s < 0.0f) s = 0.0f;
+    if (qFuzzyCompare(m_brushManager.brushSize(), s)) return;
+    m_brushManager.setBrushSize(s);
+    emit brushSizeChanged();
+    update();
+}
+
+void MyGLItem::setBrushStrength(float s) {
+    if (s < 0.0f) s = 0.0f;
+    if (qFuzzyCompare(m_brushManager.brushStrength(), s)) return;
+    m_brushManager.setBrushStrength(s);
+    emit brushStrengthChanged();
+    update();
+}
+
+
 void MyGLItem::keyPressEvent(QKeyEvent *event) {
     m_cameraController.handleKeyPress(event);
     update();
@@ -105,6 +129,25 @@ void MyGLItem::wheelEvent(QWheelEvent *event) {
     if (speedChanged || distChanged) update();
 }
 
+void MyGLItem::hoverMoveEvent(QHoverEvent *event) {
+    const QPoint pos = event->position().toPoint();
+    m_cameraController.setMousePosition(pos);
+    update(); // demande un redraw pour afficher le placeholder
+    event->accept();
+}
+
+void MyGLItem::hoverEnterEvent(QHoverEvent *event) {
+    const QPoint pos = event->position().toPoint();
+    m_cameraController.setMousePosition(pos);
+    update();
+    event->accept();
+}
+
+void MyGLItem::hoverLeaveEvent(QHoverEvent *event) {
+    update();
+    event->accept();
+}
+
 // Renderer OpenGL
 class GLRenderer : public QQuickFramebufferObject::Renderer, protected QOpenGLFunctions {
 public:
@@ -113,6 +156,7 @@ public:
     void synchronize(QQuickFramebufferObject *item) override {
         auto *glItem = qobject_cast<MyGLItem*>(item);
         if (!glItem) return;
+        m_item = glItem;
         const QVector3D oldPos = glItem->m_cameraController.camera().position();
         glItem->m_cameraController.camera().setPosition(m_cameraController.camera().position());
         if (!qFuzzyCompare(oldPos.x(), glItem->m_cameraController.camera().position().x()) ||
@@ -177,6 +221,14 @@ public:
 
         // On dessine la grille / axes selon les flags
         m_grid.draw(this, m_drawGrid, m_drawAxes);
+
+        // On uploade la texture de brosse si besoin
+        m_item->m_brushManager.uploadTextureIfNeeded();
+        // placeholder
+        QVector3D hitPoint;
+        if (m_item->m_brushManager.screenToPlane(m_cameraController.lastMousePosition(), w, h, m_cameraController.camera(), 60.f, &m_grid, hitPoint)) {
+            m_item->m_brushManager.drawPlaceholder(hitPoint, m_cameraController.camera());
+        }
 
         update();
     }
