@@ -61,15 +61,25 @@ void GLRenderer::render() {
     const double dtSec = qBound(0.0, static_cast<double>(ns) / 1e9, 0.1);
     const float dt = static_cast<float>(dtSec);
 
+    // Mise à jour FPS
     if (dt > 0.f) {
         const float instantFps = 1.0f / dt;
-        if (m_fpsAccum < 0.f) m_fpsAccum = instantFps; else m_fpsAccum = m_fpsAccum * 0.9f + instantFps * 0.1f;
+        if (m_fpsAccum < 0.f) m_fpsAccum = instantFps;
+        else m_fpsAccum = m_fpsAccum * 0.9f + instantFps * 0.1f;
     }
 
+    // Mise à jour de la camera
     bool cameraDirty = false;
     if (m_viewport) {
         m_viewport->m_cameraController.update(dt); // avance la caméra (marque dirty si changé)
         cameraDirty = m_viewport->m_cameraController.camera().isDirty();
+
+        if (cameraDirty) {
+            m_viewport->m_cameraController.camera().clearDirty();
+            emit m_viewport->cameraPositionChanged();
+            emit m_viewport->yawChanged();
+            emit m_viewport->pitchChanged();
+        }
     }
 
     // Politique de redraw minimal: on dessine uniquement si quelque chose a changé.
@@ -80,6 +90,7 @@ void GLRenderer::render() {
         return;
     }
 
+    // Configuration OpenGL
     glViewport(0, 0, framebufferObject()->width(), framebufferObject()->height());
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.129f, 0.141f, 0.161f, 1);
@@ -103,10 +114,6 @@ void GLRenderer::render() {
         m_terrainGpu.draw(this, proj, view);
     }
 
-    if (cameraDirty && m_viewport) {
-        m_viewport->m_cameraController.camera().clearDirty();
-    }
-
     // Reset redraw ponctuel
     if (m_needRedraw) m_needRedraw = false;
 
@@ -117,5 +124,6 @@ void GLRenderer::render() {
 QOpenGLFramebufferObject *GLRenderer::createFramebufferObject(const QSize &size) {
     QOpenGLFramebufferObjectFormat fmt;
     fmt.setAttachment(QOpenGLFramebufferObject::CombinedDepthStencil);
+    m_needRedraw = true;
     return new QOpenGLFramebufferObject(size, fmt);
 }
