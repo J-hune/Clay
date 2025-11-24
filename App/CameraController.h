@@ -86,7 +86,7 @@ public:
         if (m_rightButtonDown || m_middleButtonDown) {
             handleCursorWrap(localPos, rect, w);
             const float sens = m_camera.mouseSensitivity();
-            m_camera.setYaw(m_camera.yaw() + static_cast<float>(m_mouseDelta.x()) * sens);
+            m_camera.setYaw(fmodf(m_camera.yaw() + static_cast<float>(m_mouseDelta.x()) * sens + 360.f, 360.f));
             m_camera.setPitch(m_camera.pitch() - static_cast<float>(m_mouseDelta.y()) * sens);
         }
 
