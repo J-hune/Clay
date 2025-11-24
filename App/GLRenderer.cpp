@@ -10,40 +10,32 @@
 #include <QtGlobal>
 #include <iostream>
 
-GLRenderer::GLRenderer() {
+GLRenderer::GLRenderer(GLViewport *viewport) : m_viewport(viewport) {
     initializeOpenGLFunctions();
     m_timer.start();
     m_terrainGpu.initialize(this);
 }
 
 void GLRenderer::synchronize(QQuickFramebufferObject *item) {
+    // On s'attend à recevoir le même viewport passé au constructeur
     auto *glItem = qobject_cast<GLViewport*>(item);
     if (!glItem) return;
 
-    const QVector3D oldPos = glItem->m_cameraController.camera().position();
-    if (!qFuzzyCompare(oldPos.x(), glItem->m_cameraController.camera().position().x()) ||
-        !qFuzzyCompare(oldPos.y(), glItem->m_cameraController.camera().position().y()) ||
-        !qFuzzyCompare(oldPos.z(), glItem->m_cameraController.camera().position().z())) {
-        emit glItem->cameraPositionChanged();
-    }
-
-    // fps
+    // fps -> item
     glItem->setFpsFromRenderer(m_fpsAccum);
 
-    m_cameraController.camera().setPosition(glItem->m_cameraController.camera().position());
-    m_cameraController.camera().setSpeed(glItem->m_cameraController.camera().speed());
-    m_cameraController.camera().setYaw(glItem->m_cameraController.camera().yaw());
-    m_cameraController.camera().setPitch(glItem->m_cameraController.camera().pitch());
-    m_cameraController.camera().setOrbitPivot(glItem->m_cameraController.camera().orbitPivot());
-    m_cameraController.camera().setOrbitDistance(glItem->m_cameraController.camera().orbitDistance());
-    m_cameraController.camera().setMouseSensitivity(glItem->m_cameraController.camera().mouseSensitivity());
-    m_cameraController.copyInputFrom(glItem->m_cameraController);
-
+    // Détection des changements grille / axes nécessitant un redraw unique
     m_grid.setResolution(glItem->gridResolution());
     m_drawGrid = glItem->drawGrid();
     m_drawAxes = glItem->drawAxes();
+    if (m_prevGridResolution != m_grid.resolution() || m_prevDrawGrid != m_drawGrid || m_prevDrawAxes != m_drawAxes) {
+        m_needRedraw = true; // changements statiques
+        m_prevGridResolution = m_grid.resolution();
+        m_prevDrawGrid = m_drawGrid;
+        m_prevDrawAxes = m_drawAxes;
+    }
 
-    // Gestion révision terrain
+    // Gestion révision terrain GPU (rebuild GPU seulement, mesh CPU déjà généré côté viewport)
     if (glItem->userRequestedTerrain() && glItem->terrainRevision() != m_lastTerrainRevision) {
         m_lastTerrainRevision = glItem->terrainRevision();
         m_terrainGpu.setGridResolution(glItem->terrainResolution(), glItem->terrainResolution());
@@ -56,8 +48,11 @@ void GLRenderer::synchronize(QQuickFramebufferObject *item) {
             m_terrainGpu.rebuildFlat(this, glItem->heightScale());
         }
         m_terrainReady = true;
-        m_needRedraw = true;
+        m_needRedraw = true; // première frame après rebuild
     }
+
+    // Si on a besoin d'un redraw statique (terrain/grille/axes) on redemande update.
+    if (m_needRedraw) glItem->update();
 }
 
 void GLRenderer::render() {
@@ -71,7 +66,19 @@ void GLRenderer::render() {
         if (m_fpsAccum < 0.f) m_fpsAccum = instantFps; else m_fpsAccum = m_fpsAccum * 0.9f + instantFps * 0.1f;
     }
 
-    m_cameraController.update(dt);
+    bool cameraDirty = false;
+    if (m_viewport) {
+        m_viewport->m_cameraController.update(dt); // avance la caméra (marque dirty si changé)
+        cameraDirty = m_viewport->m_cameraController.camera().isDirty();
+    }
+
+    // Politique de redraw minimal: on dessine uniquement si quelque chose a changé.
+    const bool needFrame = m_needRedraw || cameraDirty;
+    if (!needFrame) {
+        // Pas de changement: on ne refait pas le clear/draw -> laisse le FBO tel quel.
+        // Pour Qt Quick FBO renderer, on doit tout de même invalider GL state proprement si nécessaire.
+        return;
+    }
 
     glViewport(0, 0, framebufferObject()->width(), framebufferObject()->height());
     glEnable(GL_DEPTH_TEST);
@@ -84,26 +91,27 @@ void GLRenderer::render() {
 
     QMatrix4x4 proj; proj.perspective(60.f, aspect, 0.1f, 1000.f);
     proj.scale(1.f, -1.f, 1.f);
-    const QMatrix4x4 view = m_cameraController.camera().viewMatrix();
+    QMatrix4x4 view;
+    if (m_viewport) view = m_viewport->m_cameraController.camera().viewMatrix();
 
     glMatrixMode(GL_PROJECTION); glLoadMatrixf(proj.constData());
     glMatrixMode(GL_MODELVIEW); glLoadMatrixf(view.constData());
 
     m_grid.draw(this, m_drawGrid, m_drawAxes);
 
-    // On ne dessine le terrain si prêt et si besoin
-    const bool cameraDirty = m_cameraController.camera().isDirty();
-    const bool shouldDrawTerrain = m_terrainReady && (m_needRedraw || cameraDirty || m_cameraController.hasActiveInput());
-    if (shouldDrawTerrain) {
+    if (m_terrainReady) {
         m_terrainGpu.draw(this, proj, view);
-        if (m_needRedraw) m_needRedraw = false; // clear the one-shot flag
-        if (cameraDirty) m_cameraController.camera().clearDirty();
     }
 
-    // On ne redemande un redraw que s'il y a une interaction utilisateur
-    if (m_cameraController.hasActiveInput() || m_needRedraw) {
-        update();
+    if (cameraDirty && m_viewport) {
+        m_viewport->m_cameraController.camera().clearDirty();
     }
+
+    // Reset redraw ponctuel
+    if (m_needRedraw) m_needRedraw = false;
+
+    // Si input actif ou caméra encore dirty (mouvement continu), on schedule la frame suivante
+    update();
 }
 
 QOpenGLFramebufferObject *GLRenderer::createFramebufferObject(const QSize &size) {

@@ -162,5 +162,5 @@ void GLViewport::wheelEvent(QWheelEvent *event) {
 
 // Renderer OpenGL
 QQuickFramebufferObject::Renderer *GLViewport::createRenderer() const {
-    return new GLRenderer();
+    return new GLRenderer(const_cast<GLViewport*>(this));
 }

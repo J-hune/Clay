@@ -143,26 +143,6 @@ public:
         }
     }
 
-    // Copie de l'état de l'entrée/clavier/souris
-    void copyInputFrom(const CameraController &o) {
-        m_moveDirections = o.m_moveDirections;
-        m_rightButtonDown = o.m_rightButtonDown;
-        m_middleButtonDown = o.m_middleButtonDown;
-        m_lastMousePos = o.m_lastMousePos;
-        m_mouseDelta = o.m_mouseDelta;
-        m_lastGlobalPos = o.m_lastGlobalPos;
-        m_mode = o.m_mode;
-    }
-
-    // Indique s'il y a une interaction utilisateur active (touches/mouse)
-    bool hasActiveInput() const {
-        if (m_rightButtonDown || m_middleButtonDown) return true;
-        for (auto it = m_moveDirections.constBegin(); it != m_moveDirections.constEnd(); ++it) {
-            if (it.value()) return true;
-        }
-        return false;
-    }
-
 private:
     // Direction du mouvement
     QMap<MoveDirection, bool> m_moveDirections;
