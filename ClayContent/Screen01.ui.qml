@@ -250,7 +250,7 @@ Rectangle {
         anchors.topMargin: 0
         anchors.bottomMargin: 0
 
-        MyGLItem {
+        GLViewport {
             id: glView
             anchors.fill: parent
             focus: true

@@ -1,14 +1,14 @@
 #include <QApplication>
 #include <QQmlApplicationEngine>
 
-#include "MyGLItem.h"
+#include "GLViewport.h"
 #include "autogen/environment.h"
 
 int main(int argc, char *argv[]) {
     set_qt_environment();
     QApplication app(argc, argv);
 
-    qmlRegisterType<MyGLItem>("MyGL", 1, 0, "MyGLItem");
+    qmlRegisterType<GLViewport>("MyGL", 1, 0, "GLViewport");
 
     QQmlApplicationEngine engine;
     const QUrl url(mainQmlFile);

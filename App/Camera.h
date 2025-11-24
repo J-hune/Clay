@@ -23,13 +23,58 @@ public:
     const QVector3D &orbitPivot() const { return m_orbitPivot; }
     float orbitDistance() const { return m_orbitDistance; }
 
-    void setPosition(const QVector3D &p) { m_position = p; }
-    void setYaw(const float y) { m_yaw = y; }
-    void setPitch(const float p) { m_pitch = qBound(-89.f, p, 89.f); }
-    void setSpeed(const float s) { m_speed = s < 0.f ? 0.f : s; }
-    void setMouseSensitivity(const float s) { m_mouseSensitivity = s < 0.f ? 0.f : s; }
-    void setOrbitPivot(const QVector3D &p) { m_orbitPivot = p; }
-    void setOrbitDistance(const float d) { m_orbitDistance = d < 0.01f ? 0.01f : d; }
+    void setPosition(const QVector3D &p) {
+        if (m_position != p) {
+            m_position = p;
+            m_dirty = true;
+        }
+    }
+
+    void setYaw(const float y) {
+        if (!qFuzzyCompare(m_yaw, y)) {
+            m_yaw = y;
+            m_dirty = true;
+        }
+    }
+
+    void setPitch(const float p) {
+        const float clamped = qBound(-89.f, p, 89.f);
+        if (!qFuzzyCompare(m_pitch, clamped)) {
+            m_pitch = clamped;
+            m_dirty = true;
+        }
+    }
+
+    void setSpeed(const float s) {
+        const float clamped = s < 0.f ? 0.f : s;
+        if (!qFuzzyCompare(m_speed, clamped)) {
+            m_speed = clamped;
+            m_dirty = true;
+        }
+    }
+
+    void setMouseSensitivity(const float s) {
+        const float clamped = s < 0.f ? 0.f : s;
+        if (!qFuzzyCompare(m_mouseSensitivity, clamped)) {
+            m_mouseSensitivity = clamped;
+            m_dirty = true;
+        }
+    }
+
+    void setOrbitPivot(const QVector3D &p) {
+        if (m_orbitPivot != p) {
+            m_orbitPivot = p;
+            m_dirty = true;
+        }
+    }
+
+    void setOrbitDistance(const float d) {
+        const float clamped = d < 0.01f ? 0.01f : d;
+        if (!qFuzzyCompare(m_orbitDistance, clamped)) {
+            m_orbitDistance = clamped;
+            m_dirty = true;
+        }
+    }
 
     // Met à jour le vecteur front à partir de yaw/pitch ; à appeler après modification de yaw/pitch
     void recomputeFront() {
@@ -39,8 +84,12 @@ public:
             sinf(qDegreesToRadians(m_yaw)) * cosf(qDegreesToRadians(m_pitch))
         );
         front.normalize();
-        m_front = front;
+        if (m_front != front) { m_front = front; m_dirty = true; }
     }
+
+    // Dirty flag: indique si la caméra a changé depuis la dernière fois
+    bool isDirty() const { return m_dirty; }
+    void clearDirty() { m_dirty = false; }
 
 private:
     QVector3D m_position{0.f, 1.8f, 5.f};
@@ -51,6 +100,7 @@ private:
     float m_yaw = -90.f;
     float m_pitch = 0.f;
     float m_mouseSensitivity = 0.15f;
+    bool m_dirty = true; // on considère qu'elle a changé au départ
 };
 
 #endif // CLAYAPP_CAMERA_H

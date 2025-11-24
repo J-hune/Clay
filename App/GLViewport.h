@@ -1,5 +1,5 @@
-#ifndef CLAYAPP_MYGLITEM_H
-#define CLAYAPP_MYGLITEM_H
+#ifndef CLAYAPP_GLVIEWPORT_H
+#define CLAYAPP_GLVIEWPORT_H
 
 #include "CameraController.h"
 #include "Grid.h"
@@ -7,11 +7,18 @@
 #include <QQuickFramebufferObject>
 #include <QVector3D>
 
-class MyGLItem : public QQuickFramebufferObject {
+class GLViewport : public QQuickFramebufferObject {
     Q_OBJECT
 
 public:
-    explicit MyGLItem(QQuickItem *parent = nullptr);
+    explicit GLViewport(QQuickItem *parent = nullptr);
+
+    // Methodes de synchronisation avec le renderer
+    void exportCameraController(class CameraController &out) const;
+    void setCameraFromRenderer(const class CameraController &src);
+    void setFpsFromRenderer(float fps);
+    bool userRequestedTerrain() const { return m_userRequestedTerrain; }
+    int terrainRevision() const { return m_terrainRevision; }
 
     Q_PROPERTY(int gridResolution READ gridResolution WRITE setGridResolution NOTIFY gridResolutionChanged)
     Q_PROPERTY(QVector3D cameraPosition READ cameraPosition NOTIFY cameraPositionChanged)
@@ -71,6 +78,7 @@ public:
     void setHeightScale(float s);
     void setTerrainMode(int m);
     Q_INVOKABLE void generateTerrain();
+    void clearUserRequestedTerrain();
 
 signals:
     void gridResolutionChanged();
@@ -99,7 +107,6 @@ protected:
     void wheelEvent(QWheelEvent *event) override;
 
 private:
-    friend class GLRenderer;
     CameraController m_cameraController;
     Grid m_grid;
     float m_fps = 0.f;
@@ -118,4 +125,4 @@ private:
     bool m_userRequestedTerrain = false; // aucune génération avant action utilisateur
 };
 
-#endif // CLAYAPP_MYGLITEM_H
+#endif // CLAYAPP_GLVIEWPORT_H
