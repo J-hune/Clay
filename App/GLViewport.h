@@ -14,8 +14,6 @@ public:
     explicit GLViewport(QQuickItem *parent = nullptr);
 
     // Methodes de synchronisation avec le renderer
-    void exportCameraController(class CameraController &out) const;
-    void setCameraFromRenderer(const class CameraController &src);
     void setFpsFromRenderer(float fps);
     bool userRequestedTerrain() const { return m_userRequestedTerrain; }
     int terrainRevision() const { return m_terrainRevision; }
@@ -78,7 +76,6 @@ public:
     void setHeightScale(float s);
     void setTerrainMode(int m);
     Q_INVOKABLE void generateTerrain();
-    void clearUserRequestedTerrain();
 
 signals:
     void gridResolutionChanged();
@@ -107,6 +104,7 @@ protected:
     void wheelEvent(QWheelEvent *event) override;
 
 private:
+    friend class GLRenderer;
     CameraController m_cameraController;
     Grid m_grid;
     float m_fps = 0.f;

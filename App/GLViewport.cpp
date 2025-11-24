@@ -19,32 +19,6 @@ GLViewport::GLViewport(QQuickItem *parent) : QQuickFramebufferObject(parent) {
     setFocus(true);
 }
 
-// Export internal camera controller state into the provided CameraController
-void GLViewport::exportCameraController(CameraController &out) const {
-    // copy camera parameters
-    out.camera().setPosition(m_cameraController.camera().position());
-    out.camera().setYaw(m_cameraController.camera().yaw());
-    out.camera().setPitch(m_cameraController.camera().pitch());
-    out.camera().setSpeed(m_cameraController.camera().speed());
-    out.camera().setMouseSensitivity(m_cameraController.camera().mouseSensitivity());
-    out.camera().setOrbitDistance(m_cameraController.camera().orbitDistance());
-    out.camera().setOrbitPivot(m_cameraController.camera().orbitPivot());
-    // copy input state
-    out.copyInputFrom(m_cameraController);
-}
-
-// Update internal camera from renderer's copy
-void GLViewport::setCameraFromRenderer(const CameraController &src) {
-    m_cameraController.camera().setPosition(src.camera().position());
-    m_cameraController.camera().setYaw(src.camera().yaw());
-    m_cameraController.camera().setPitch(src.camera().pitch());
-    m_cameraController.setSpeed(src.camera().speed());
-    m_cameraController.setMouseSensitivity(src.camera().mouseSensitivity());
-    m_cameraController.setOrbitDistance(src.camera().orbitDistance());
-    m_cameraController.camera().setOrbitPivot(src.camera().orbitPivot());
-    m_cameraController.copyInputFrom(src);
-}
-
 void GLViewport::setFpsFromRenderer(float fps) {
     if (!qFuzzyCompare(m_fps, fps)) { m_fps = fps; emit fpsChanged(); }
 }
@@ -137,10 +111,6 @@ void GLViewport::generateTerrain() {
     ++m_terrainRevision;
     emit terrainReadyChanged();
     update();
-}
-
-void GLViewport::clearUserRequestedTerrain() {
-    m_userRequestedTerrain = false;
 }
 
 void GLViewport::keyPressEvent(QKeyEvent *event) {

@@ -20,34 +20,24 @@ void GLRenderer::synchronize(QQuickFramebufferObject *item) {
     auto *glItem = qobject_cast<GLViewport*>(item);
     if (!glItem) return;
 
-    // Synchronisation caméra / stats
-    CameraController tmpFromItem;
-    glItem->exportCameraController(tmpFromItem);
-
-    const QVector3D oldPos = tmpFromItem.camera().position();
-    // push renderer camera back to item if changed
-    tmpFromItem.camera().setPosition(m_cameraController.camera().position());
-    if (!qFuzzyCompare(oldPos.x(), tmpFromItem.camera().position().x()) ||
-        !qFuzzyCompare(oldPos.y(), tmpFromItem.camera().position().y()) ||
-        !qFuzzyCompare(oldPos.z(), tmpFromItem.camera().position().z())) {
+    const QVector3D oldPos = glItem->m_cameraController.camera().position();
+    if (!qFuzzyCompare(oldPos.x(), glItem->m_cameraController.camera().position().x()) ||
+        !qFuzzyCompare(oldPos.y(), glItem->m_cameraController.camera().position().y()) ||
+        !qFuzzyCompare(oldPos.z(), glItem->m_cameraController.camera().position().z())) {
         emit glItem->cameraPositionChanged();
     }
 
     // fps
     glItem->setFpsFromRenderer(m_fpsAccum);
 
-    // copy user state from item into renderer
-    CameraController itemCam; glItem->exportCameraController(itemCam);
-    // copy camera parameters
-    m_cameraController.camera().setPosition(itemCam.camera().position());
-    m_cameraController.camera().setYaw(itemCam.camera().yaw());
-    m_cameraController.camera().setPitch(itemCam.camera().pitch());
-    m_cameraController.setSpeed(itemCam.camera().speed());
-    m_cameraController.setMouseSensitivity(itemCam.camera().mouseSensitivity());
-    m_cameraController.setOrbitDistance(itemCam.camera().orbitDistance());
-    m_cameraController.camera().setOrbitPivot(itemCam.camera().orbitPivot());
-    // copy input state
-    m_cameraController.copyInputFrom(itemCam);
+    m_cameraController.camera().setPosition(glItem->m_cameraController.camera().position());
+    m_cameraController.camera().setSpeed(glItem->m_cameraController.camera().speed());
+    m_cameraController.camera().setYaw(glItem->m_cameraController.camera().yaw());
+    m_cameraController.camera().setPitch(glItem->m_cameraController.camera().pitch());
+    m_cameraController.camera().setOrbitPivot(glItem->m_cameraController.camera().orbitPivot());
+    m_cameraController.camera().setOrbitDistance(glItem->m_cameraController.camera().orbitDistance());
+    m_cameraController.camera().setMouseSensitivity(glItem->m_cameraController.camera().mouseSensitivity());
+    m_cameraController.copyInputFrom(glItem->m_cameraController);
 
     m_grid.setResolution(glItem->gridResolution());
     m_drawGrid = glItem->drawGrid();
@@ -67,7 +57,6 @@ void GLRenderer::synchronize(QQuickFramebufferObject *item) {
         }
         m_terrainReady = true;
         m_needRedraw = true;
-        glItem->clearUserRequestedTerrain();
     }
 }
 
