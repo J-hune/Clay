@@ -3,10 +3,12 @@
 
 #include "GLViewport.h"
 #include "autogen/environment.h"
+#include "Log.h"
 
 int main(int argc, char *argv[]) {
     set_qt_environment();
     QApplication app(argc, argv);
+    Log::setLevel(Log::Level::Warn);
 
     qmlRegisterType<GLViewport>("MyGL", 1, 0, "GLViewport");
 

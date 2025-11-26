@@ -1,6 +1,6 @@
 #include "TerrainRaycast.h"
 #include <QOpenGLShader>
-#include <iostream>
+#include "Log.h"
 
 static const char *computeShaderSource = R"(
 #version 430 core
@@ -146,16 +146,18 @@ void TerrainRaycast::ensureProgram(QOpenGLExtraFunctions *gl) {
     m_computeProgram.reset(new QOpenGLShaderProgram);
 
     if (!m_computeProgram->addShaderFromSourceCode(QOpenGLShader::Compute, computeShaderSource)) {
-        std::cerr << "Erreur compilation compute shader: " << m_computeProgram->log().toStdString() << std::endl;
+        LOG_ERROR() << "Erreur de compilation du compute shader: " << m_computeProgram->log().toStdString();
         m_computeProgram.reset();
         return;
     }
 
     if (!m_computeProgram->link()) {
-        std::cerr << "Erreur link compute shader: " << m_computeProgram->log().toStdString() << std::endl;
+        LOG_ERROR() << "Erreur de linkage du compute shader: " << m_computeProgram->log().toStdString();
         m_computeProgram.reset();
         return;
     }
+
+    LOG_INFO() << "Compute shader de raycast compilé et lié";
 }
 
 void TerrainRaycast::ensureSSBO(QOpenGLExtraFunctions *gl) {
@@ -169,6 +171,8 @@ void TerrainRaycast::ensureSSBO(QOpenGLExtraFunctions *gl) {
     gl->glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(RaycastResult), &initialData, GL_DYNAMIC_READ);
 
     gl->glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    LOG_INFO() << "SSBO pour raycast créé, taille=" << sizeof(RaycastResult) << " octets";
 }
 
 void TerrainRaycast::performRaycast(QOpenGLExtraFunctions *gl,
