@@ -29,12 +29,15 @@ private:
     bool m_terrainReady = false;
     int m_lastTerrainRevision = -1;
     bool m_needRedraw = false; // demande ponctuelle (terrain rebuild / changement grille / axes)
-    TerrainRaycast m_terrainRaycast; // pour raycast GPU
 
     // Etats précédents pour détecter un changement côté QML
     int m_prevGridResolution = -1;
     bool m_prevDrawGrid = true;
     bool m_prevDrawAxes = true;
+
+    // Raycast GPU
+    TerrainRaycast m_terrainRaycast;
+    bool m_mouseMoved = false;
 };
 
 #endif // CLAYAPP_GLRENDERER_H

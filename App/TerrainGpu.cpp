@@ -82,7 +82,7 @@ void main() {
         if (dist < highlightRadius) {
             float t = smoothstep(highlightRadius, 0.0, dist);
             vec3 purple = vec3(0.8, 0.2, 1.0);
-            lit = mix(lit, purple, t * 0.8);
+            lit = mix(lit, purple, t);
         }
     }
 

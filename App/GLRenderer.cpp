@@ -61,6 +61,7 @@ void GLRenderer::synchronize(QQuickFramebufferObject *item) {
     }
 
     // Si on a besoin d'un redraw statique (terrain/grille/axes) on redemande update.
+    m_mouseMoved = glItem->m_raycastRequested;
     if (m_needRedraw) glItem->update();
 }
 
@@ -91,8 +92,8 @@ void GLRenderer::render() {
         }
     }
 
-    // Politique de redraw minimal: on dessine uniquement si quelque chose a changé.
-    const bool needFrame = m_needRedraw || cameraDirty;
+    // Politique de redraw minimal: on dessine si quelque chose a changé OU si la souris bouge (raytracing)
+    const bool needFrame = m_needRedraw || cameraDirty || m_mouseMoved;
     if (!needFrame) {
         // Pas de changement: on ne refait pas le clear/draw -> laisse le FBO tel quel.
         // Pour Qt Quick FBO renderer, on doit tout de même invalider GL state proprement si nécessaire.
@@ -122,12 +123,10 @@ void GLRenderer::render() {
     if (m_terrainReady) {
         m_terrainGpu.draw(this, proj, view);
 
-        // Si un raycast est demandé, on l'exécute
-        if (m_viewport && m_viewport->m_raycastRequested) {
-            m_viewport->m_raycastRequested = false;
-
+        // Lancer le raycast si demandé (par move) ou si on force sur mouseMoved
+        if (m_mouseMoved) {
             // On configure les bounds du terrain
-            m_terrainRaycast.setTerrainBounds(-50.0f, 50.0f, 50.0f, -50.0f);
+            m_terrainRaycast.setTerrainBounds(-50.0f, 50.0f, -50.0f, 50.0f);
             m_terrainRaycast.performRaycast(
                 this,
                 m_viewport->m_mouseNDC,
@@ -139,7 +138,7 @@ void GLRenderer::render() {
             );
 
             // On lit le résultat
-            RaycastResult result = m_terrainRaycast.readResult(this);
+            const RaycastResult result = m_terrainRaycast.readResult(this);
 
             if (result.hitFlag > 0.5f) {
                 const QVector3D hitPos(result.posX, result.posY, result.posZ);
@@ -151,8 +150,9 @@ void GLRenderer::render() {
         }
     }
 
-    // Reset redraw ponctuel
+    // Reset redraw ponctuel + reset flag mouseMoved (copie locale seulement)
     if (m_needRedraw) m_needRedraw = false;
+    m_mouseMoved = false;
 
     // Si input actif ou caméra encore dirty (mouvement continu), on schedule la frame suivante
     update();

@@ -30,12 +30,10 @@ float getTerrainHeight(vec2 xz) {
     vec2 terrainMin = uTerrainBounds.xz;
     vec2 terrainMax = uTerrainBounds.yw;
 
-    // Convertir position monde -> UV [0,1]
     vec2 uv = (xz - terrainMin) / (terrainMax - terrainMin);
 
-    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
-        return -9999.0; // En dehors du terrain
-    }
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0)
+        return -1e8;
 
     float h = texture(uHeightmap, uv).r;
     return h * uHeightScale;
@@ -43,14 +41,18 @@ float getTerrainHeight(vec2 xz) {
 
 // Calcule la normale au point XZ
 vec3 computeNormal(vec2 xz) {
-    float delta = 0.01;
+    // delta basé sur la résolution → stable
+    float terrainSizeX = uTerrainBounds.y - uTerrainBounds.x;
+    float terrainSizeZ = uTerrainBounds.w - uTerrainBounds.z;
+    float delta = (terrainSizeX + terrainSizeZ) * 0.5 / float(uHeightmapRes);
+
     float hL = getTerrainHeight(xz + vec2(-delta, 0.0));
     float hR = getTerrainHeight(xz + vec2(delta, 0.0));
     float hD = getTerrainHeight(xz + vec2(0.0, -delta));
     float hU = getTerrainHeight(xz + vec2(0.0, delta));
 
-    vec3 tangentX = normalize(vec3(2.0 * delta, hR - hL, 0.0));
-    vec3 tangentZ = normalize(vec3(0.0, hU - hD, 2.0 * delta));
+    vec3 tangentX = vec3(2.0 * delta, hR - hL, 0.0);
+    vec3 tangentZ = vec3(0.0, hU - hD, 2.0 * delta);
 
     return normalize(cross(tangentZ, tangentX));
 }
@@ -66,52 +68,58 @@ void main() {
     vec3 rayOrigin = nearPoint.xyz;
     vec3 rayDir = normalize(farPoint.xyz - nearPoint.xyz);
 
-    // Paramètres de raymarching
-    const int maxSteps = 256;
+    const int maxSteps = 512;
     const float maxDist = 1000.0;
-    const int binarySteps = 8;
+    const int binarySteps = 10;
 
+    float stepSize = maxDist / float(maxSteps);
     float t = 0.0;
     bool hit = false;
     vec3 hitPos = vec3(0.0);
 
-    // Raymarch grossier
-    for (int i = 0; i < maxSteps; i++) {
-        vec3 p = rayOrigin + rayDir * t;
-        float terrainH = getTerrainHeight(p.xz);
+    // early check si le rayon démarre dans le terrain
+    float h0 = getTerrainHeight(rayOrigin.xz);
+    if (rayOrigin.y <= h0) {
+        hit = true;
+        hitPos = rayOrigin;
+    }
 
-        if (terrainH == -9999.0) {
-            // En dehors du terrain, on continue
-            t += maxDist / float(maxSteps);
-            if (t > maxDist) break;
-            continue;
-        }
+    // Raymarch
+    if (!hit) {
+        for (int i = 0; i < maxSteps; i++) {
+            vec3 p = rayOrigin + rayDir * t;
+            float terrainH = getTerrainHeight(p.xz);
 
-        if (p.y <= terrainH) {
-            // On a traversé le terrain, binary search
-            float tMin = t - maxDist / float(maxSteps);
-            float tMax = t;
-
-            for (int j = 0; j < binarySteps; j++) {
-                float tMid = (tMin + tMax) * 0.5;
-                vec3 pMid = rayOrigin + rayDir * tMid;
-                float hMid = getTerrainHeight(pMid.xz);
-
-                if (pMid.y > hMid) {
-                    tMin = tMid;
-                } else {
-                    tMax = tMid;
-                }
+            if (terrainH < -9e7) { // sentinel
+                t += stepSize;
+                if (t > maxDist) break;
+                continue;
             }
 
-            t = (tMin + tMax) * 0.5;
-            hitPos = rayOrigin + rayDir * t;
-            hit = true;
-            break;
-        }
+            if (p.y <= terrainH) {
+                float tMin = t - stepSize;
+                float tMax = t;
 
-        t += maxDist / float(maxSteps);
-        if (t > maxDist) break;
+                for (int j = 0; j < binarySteps; j++) {
+                    float tMid = 0.5 * (tMin + tMax);
+                    vec3 pMid = rayOrigin + rayDir * tMid;
+                    float hMid = getTerrainHeight(pMid.xz);
+
+                    if (pMid.y > hMid)
+                        tMin = tMid;
+                    else
+                        tMax = tMid;
+                }
+
+                t = 0.5 * (tMin + tMax);
+                hitPos = rayOrigin + rayDir * t;
+                hit = true;
+                break;
+            }
+
+            t += stepSize;
+            if (t > maxDist) break;
+        }
     }
 
     // Écrire le résultat dans le SSBO

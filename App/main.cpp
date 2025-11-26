@@ -8,7 +8,7 @@
 int main(int argc, char *argv[]) {
     set_qt_environment();
     QApplication app(argc, argv);
-    Log::setLevel(Log::Level::Warn);
+    Log::setLevel(Log::Level::Debug);
 
     qmlRegisterType<GLViewport>("MyGL", 1, 0, "GLViewport");
 
