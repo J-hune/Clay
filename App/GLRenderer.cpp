@@ -14,6 +14,7 @@ GLRenderer::GLRenderer(GLViewport *viewport) : m_viewport(viewport) {
     initializeOpenGLFunctions();
     m_timer.start();
     m_terrainGpu.initialize(this);
+    m_terrainRaycast.initialize(this);
 }
 
 void GLRenderer::synchronize(QQuickFramebufferObject *item) {
@@ -112,6 +113,34 @@ void GLRenderer::render() {
 
     if (m_terrainReady) {
         m_terrainGpu.draw(this, proj, view);
+
+        // Si un raycast est demandé, on l'exécute
+        if (m_viewport && m_viewport->m_raycastRequested) {
+            m_viewport->m_raycastRequested = false;
+
+            // On configure les bounds du terrain
+            m_terrainRaycast.setTerrainBounds(-50.0f, 50.0f, 50.0f, -50.0f);
+            m_terrainRaycast.performRaycast(
+                this,
+                m_viewport->m_mouseNDC,
+                proj,
+                view,
+                m_terrainGpu.heightmapTexture(),
+                m_viewport->heightmapResolution(),
+                m_viewport->heightScale()
+            );
+
+            // On lit le résultat
+            RaycastResult result = m_terrainRaycast.readResult(this);
+
+            if (result.hitFlag > 0.5f) {
+                const QVector3D hitPos(result.posX, result.posY, result.posZ);
+                m_terrainGpu.setRaycastHit(hitPos);
+                m_needRedraw = true;
+            } else {
+                m_terrainGpu.clearRaycastHit();
+            }
+        }
     }
 
     // Reset redraw ponctuel

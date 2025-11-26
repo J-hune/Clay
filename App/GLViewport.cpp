@@ -141,6 +141,22 @@ void GLViewport::mouseMoveEvent(QMouseEvent *event) {
     if (!qFuzzyCompare(oldYaw, m_cameraController.camera().yaw())) emit yawChanged();
     if (!qFuzzyCompare(oldPitch, m_cameraController.camera().pitch())) emit pitchChanged();
 
+    // On calcule la position de la souris en NDC pour le raycast
+    const QPointF itemPos = mapFromScene(localPos);
+    const float x = static_cast<float>(itemPos.x());
+    const float y = static_cast<float>(itemPos.y());
+    const float w_width = static_cast<float>(width());
+    const float w_height = static_cast<float>(height());
+
+    if (w_width > 0.f && w_height > 0.f) {
+        const float ndcX = (2.0f * x / w_width) - 1.0f;
+        const float ndcY = (2.0f * y / w_height) - 1.0f;
+        m_mouseNDC = QVector2D(ndcX, ndcY);
+        m_raycastRequested = true;
+    } else {
+        qWarning("GLViewport::mouseMoveEvent : largeur/hauteur invalide pour le calcul NDC");
+    }
+
     update();
 }
 
