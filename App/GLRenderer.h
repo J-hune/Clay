@@ -7,10 +7,11 @@
 #include "CameraController.h"
 #include "Grid.h"
 #include "TerrainGpu.h"
+#include "TerrainRaycast.h"
 
 class GLViewport; // forward
 
-class GLRenderer : public QQuickFramebufferObject::Renderer, protected QOpenGLFunctions {
+class GLRenderer : public QQuickFramebufferObject::Renderer, protected QOpenGLExtraFunctions {
 public:
     GLRenderer(GLViewport *viewport);
     void synchronize(QQuickFramebufferObject *item) override;
@@ -28,6 +29,7 @@ private:
     bool m_terrainReady = false;
     int m_lastTerrainRevision = -1;
     bool m_needRedraw = false; // demande ponctuelle (terrain rebuild / changement grille / axes)
+    TerrainRaycast m_terrainRaycast; // pour raycast GPU
 
     // Etats précédents pour détecter un changement côté QML
     int m_prevGridResolution = -1;

@@ -119,6 +119,10 @@ private:
     QUrl m_heightmapSource; // source image
     float m_heightScale = 30.f;
     int m_terrainMode = 0; // 0 flat, 1 heightmap
+
+    // Raycast GPU
+    QVector2D m_mouseNDC{0.f, 0.f}; // Position souris en NDC
+    bool m_raycastRequested = false;
     int m_heightmapResolution = 512; // texture heightmap
     bool m_userRequestedTerrain = false; // aucune génération avant action utilisateur
 };

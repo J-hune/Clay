@@ -11,12 +11,14 @@ uniform float uHeightScale;
 // Varyings
 varying float vHeight;
 varying vec2 vUV;
+varying vec3 vWorldPos;
 void main() {
     vec2 worldSize = vec2(100.0, 100.0); // taille fixe
     vUV = aUV;
     float h = texture2D(uHeight, aUV).r * uHeightScale;
     vHeight = h;
     vec2 posXZ = (aUV - vec2(0.5)) * worldSize;
+    vWorldPos = vec3(posXZ.x, h, posXZ.y);
     gl_Position = uMVP * vec4(posXZ.x, h, posXZ.y, 1.0);
 }
 )GLSL";
@@ -26,8 +28,11 @@ static const char *kFS = R"GLSL(
 uniform sampler2D uHeight;
 uniform float uHeightScale;
 uniform float uTexSize; // résolution de la heightmap
+uniform vec3 uHitPos; // Position du hit du raycast
+uniform float uHitValid; // 1.0 si hit valide, 0.0 sinon
 varying float vHeight;
 varying vec2 vUV;
+varying vec3 vWorldPos;
 
 // Calcule une normale approchée depuis la texture height (centrée)
 vec3 computeNormal(vec2 uv) {
@@ -68,6 +73,17 @@ void main() {
     float diff = max(dot(N, L), 0.0);
     float ambient = 0.35;
     vec3 lit = baseCol * (ambient + diff * 0.65);
+
+    // Visualisation du point de hit en violet (Temporaire: TODO remove)
+    if (uHitValid > 0.5) {
+        float dist = distance(vWorldPos, uHitPos);
+        float highlightRadius = 2; // rayon de la zone violette
+        if (dist < highlightRadius) {
+            float t = smoothstep(highlightRadius, 0.0, dist);
+            vec3 purple = vec3(0.8, 0.2, 1.0);
+            lit = mix(lit, purple, t * 0.8);
+        }
+    }
 
     gl_FragColor = vec4(lit, 1.0);
 }
@@ -255,6 +271,10 @@ void TerrainGpu::draw(QOpenGLFunctions *gl, const QMatrix4x4 &proj, const QMatri
     m_program->setUniformValue("uMVP", mvp);
     m_program->setUniformValue("uHeightScale", m_heightScale);
     m_program->setUniformValue("uTexSize", static_cast<float>(m_texRes));
+
+    // Uniforms pour la visualisation du raycast hit
+    m_program->setUniformValue("uHitPos", m_hitPos);
+    m_program->setUniformValue("uHitValid", m_hitValid ? 1.0f : 0.0f);
 
     gl->glActiveTexture(GL_TEXTURE0);
     gl->glBindTexture(GL_TEXTURE_2D, m_tex);
