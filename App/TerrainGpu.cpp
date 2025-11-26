@@ -1,6 +1,7 @@
 #include "TerrainGpu.h"
 #include <QRgba64>
 #include <algorithm>
+#include "Log.h"
 
 static const char *kVS = R"GLSL(
 #version 120
@@ -93,10 +94,21 @@ void TerrainGpu::ensureProgram(const QOpenGLFunctions *gl) {
     Q_UNUSED(gl);
     if (m_program && m_program->isLinked()) return;
     m_program.reset(new QOpenGLShaderProgram());
-    m_program->addShaderFromSourceCode(QOpenGLShader::Vertex, kVS);
-    m_program->addShaderFromSourceCode(QOpenGLShader::Fragment, kFS);
+    if (!m_program->addShaderFromSourceCode(QOpenGLShader::Vertex, kVS)) {
+        LOG_ERROR() << "Échec compilation Vertex Shader terrain: " << m_program->log().toStdString();
+        return;
+    }
+    if (!m_program->addShaderFromSourceCode(QOpenGLShader::Fragment, kFS)) {
+        LOG_ERROR() << "Échec compilation Fragment Shader terrain: " << m_program->log().toStdString();
+        return;
+    }
     m_program->bindAttributeLocation("aUV", 0);
-    m_program->link();
+    if (!m_program->link()) {
+        LOG_ERROR() << "Échec link du programme shader terrain: " << m_program->log().toStdString();
+        m_program.reset();
+        return;
+    }
+    LOG_INFO() << "Shaders terrain compilés et liés";
 }
 
 void TerrainGpu::ensureMesh(QOpenGLFunctions *gl) {
@@ -143,6 +155,8 @@ void TerrainGpu::ensureMesh(QOpenGLFunctions *gl) {
     gl->glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     m_dirtyMesh = false;
+    LOG_DEBUG() << "Maillage terrain (VBO/IBO) prêt: resX=" << m_gridResX << " resZ=" << m_gridResZ
+                << " indices=" << m_indices.size();
 }
 
 void TerrainGpu::ensureTexture(QOpenGLFunctions *gl) {
@@ -155,13 +169,14 @@ void TerrainGpu::ensureTexture(QOpenGLFunctions *gl) {
         gl->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         gl->glBindTexture(GL_TEXTURE_2D, 0);
         m_dirtyTexture = true;
+        LOG_INFO() << "Texture heightmap allouée (id=" << m_tex << ")";
     }
     if (m_dirtyTexture) {
         gl->glBindTexture(GL_TEXTURE_2D, m_tex);
-        // alloue une texture R32F (données nulles pour l'instant)
         gl->glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, m_texRes, m_texRes, 0, GL_RED, GL_FLOAT, nullptr);
         gl->glBindTexture(GL_TEXTURE_2D, 0);
         m_dirtyTexture = false;
+        LOG_INFO() << "Texture heightmap (R32F) initialisée: " << m_texRes << "x" << m_texRes;
     }
 }
 
@@ -171,6 +186,7 @@ void TerrainGpu::uploadHeightData(QOpenGLFunctions *gl, const float *data, int w
     gl->glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RED, GL_FLOAT, data);
     gl->glBindTexture(GL_TEXTURE_2D, 0);
     m_haveTextureData = true;
+    LOG_INFO() << "Heightmap uploadée: " << width << "x" << height;
 }
 
 void TerrainGpu::initialize(QOpenGLFunctions *gl) {
@@ -251,6 +267,7 @@ void TerrainGpu::rebuild(QOpenGLFunctions *gl, const QImage &sourceImg, float he
         }
     }
     uploadHeightData(gl, data.data(), m_texRes, m_texRes);
+    LOG_INFO() << "Terrain reconstruit depuis heightmap, scale=" << m_heightScale;
 }
 
 void TerrainGpu::rebuildFlat(QOpenGLFunctions *gl, float heightScale) {
@@ -260,6 +277,7 @@ void TerrainGpu::rebuildFlat(QOpenGLFunctions *gl, float heightScale) {
     m_heightScale = heightScale;
     std::vector<float> data; data.assign(size_t(m_texRes) * size_t(m_texRes), 0.f);
     uploadHeightData(gl, data.data(), m_texRes, m_texRes);
+    LOG_INFO() << "Terrain plat reconstruit, scale=" << m_heightScale;
 }
 
 void TerrainGpu::draw(QOpenGLFunctions *gl, const QMatrix4x4 &proj, const QMatrix4x4 &view) {

@@ -3,7 +3,7 @@
 
 #include <QImageReader>
 #include <QFileInfo>
-#include <iostream>
+#include "Log.h"
 
 // Chargement d'image utilitaire (supporte EXR via QImageReader si disponible) // TODO FIX
 inline QImage loadHeightImage(const QUrl &url) {
@@ -11,16 +11,24 @@ inline QImage loadHeightImage(const QUrl &url) {
     QImage img;
     QImageReader reader(path);
     const QString suffix = QFileInfo(path).suffix().toLower();
-    std::cout << "Loading heightmap image from: " << path.toStdString() << " (suffix: " << suffix.toStdString() << ")" << std::endl;
+    LOG_INFO() << "Chargement heightmap: " << path.toStdString() << " (suffixe: " << suffix.toStdString() << ")";
     if (suffix == QLatin1String("exr")) reader.setFormat("exr");
     if (reader.canRead()) {
         reader.setAutoTransform(true);
         img = reader.read();
-        if (!img.isNull()) return img;
+        if (!img.isNull()) {
+            LOG_INFO() << "Heightmap lue avec succès: " << img.width() << "x" << img.height() << " format=" << img.format();
+            return img;
+        }
+        LOG_WARN() << "Lecture heightmap: image vide (" << reader.errorString().toStdString() << ")";
     } else {
-        std::cout << "Impossible de lire l'image: " << reader.errorString().toStdString() << std::endl;
+        LOG_WARN() << "Impossible de lire l'image via QImageReader: " << reader.errorString().toStdString();
     }
-    img.load(path);
+    if (!img.load(path)) {
+        LOG_ERROR() << "Échec chargement heightmap via QImage::load: " << path.toStdString();
+    } else {
+        LOG_INFO() << "Heightmap chargée via QImage::load: " << img.width() << "x" << img.height();
+    }
     return img;
 }
 

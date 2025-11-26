@@ -8,7 +8,7 @@
 #include <QQuickWindow>
 #include <QMatrix4x4>
 #include <QtGlobal>
-#include <iostream>
+#include "Log.h"
 
 GLRenderer::GLRenderer(GLViewport *viewport) : m_viewport(viewport) {
     initializeOpenGLFunctions();
@@ -43,10 +43,18 @@ void GLRenderer::synchronize(QQuickFramebufferObject *item) {
         m_terrainGpu.setTextureResolution(glItem->heightmapResolution());
         if (glItem->terrainMode() == 1 && !glItem->heightmapSource().isEmpty()) {
             const QImage img = loadHeightImage(glItem->heightmapSource());
-            if (!img.isNull()) m_terrainGpu.rebuild(this, img, glItem->heightScale());
-            else m_terrainGpu.rebuildFlat(this, glItem->heightScale());
+            if (!img.isNull()) {
+                m_terrainGpu.rebuild(this, img, glItem->heightScale());
+                LOG_INFO() << "Terrain reconstruit (heightmap) - res=" << glItem->terrainResolution()
+                           << ", texRes=" << glItem->heightmapResolution() << ", scale=" << glItem->heightScale();
+            } else {
+                m_terrainGpu.rebuildFlat(this, glItem->heightScale());
+                LOG_WARN() << "Impossible de charger la heightmap, terrain plat utilisé";
+            }
         } else {
             m_terrainGpu.rebuildFlat(this, glItem->heightScale());
+            LOG_INFO() << "Terrain plat reconstruit - res=" << glItem->terrainResolution()
+                       << ", texRes=" << glItem->heightmapResolution() << ", scale=" << glItem->heightScale();
         }
         m_terrainReady = true;
         m_needRedraw = true; // première frame après rebuild
@@ -154,5 +162,7 @@ QOpenGLFramebufferObject *GLRenderer::createFramebufferObject(const QSize &size)
     QOpenGLFramebufferObjectFormat fmt;
     fmt.setAttachment(QOpenGLFramebufferObject::CombinedDepthStencil);
     m_needRedraw = true;
-    return new QOpenGLFramebufferObject(size, fmt);
+    auto *fbo = new QOpenGLFramebufferObject(size, fmt);
+    LOG_INFO() << "FBO créé: " << size.width() << "x" << size.height();
+    return fbo;
 }

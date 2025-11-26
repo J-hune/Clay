@@ -1,8 +1,8 @@
 #include "TerrainMesh.h"
 #include <cmath>
-#include <iostream>
 #include <QImage>
 #include <QRgba64>
+#include "Log.h"
 
 void TerrainMesh::clear() {
     m_positions.clear();
@@ -14,6 +14,7 @@ void TerrainMesh::clear() {
 void TerrainMesh::buildFlat(int rx, int rz) {
     clear();
     if (rx < 2 || rz < 2) return;
+    LOG_INFO() << "Construction terrain plat: res=" << rx << "x" << rz;
     m_positions.reserve(rx * rz);
     m_normals.reserve(rx * rz);
 
@@ -96,9 +97,12 @@ static float sampleBilinearF32(const QImage &img, float u, float v) {
 }
 
 void TerrainMesh::buildHeightmap(const QImage &sourceImg, const int rx, const int rz, const float heightScale) {
-    std::cout << "Building heightmap terrain mesh with resolution " << rx << "x" << rz << std::endl;
+    LOG_INFO() << "Construction terrain depuis heightmap: res=" << rx << "x" << rz << " scale=" << heightScale;
     clear();
-    if (rx < 2 || rz < 2 || sourceImg.isNull()) return;
+    if (rx < 2 || rz < 2 || sourceImg.isNull()) {
+        LOG_WARN() << "Paramètres invalides pour buildHeightmap ou image nulle";
+        return;
+    }
 
     const QImage &img = sourceImg; // conserver profondeur si fournie (EXR -> 16-bit)
 
@@ -171,6 +175,7 @@ void TerrainMesh::uploadGL(QOpenGLFunctions *gl) {
     gl->glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     m_uploaded = true;
+    LOG_INFO() << "Mesh CPU uploadé vers GPU: vtx=" << m_positions.size() << " indices=" << m_indices.size();
 }
 
 void TerrainMesh::draw(QOpenGLFunctions *gl) const {
