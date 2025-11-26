@@ -102,6 +102,7 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
+    void hoverMoveEvent(QHoverEvent *event) override;
 
 private:
     friend class GLRenderer;
@@ -119,12 +120,12 @@ private:
     QUrl m_heightmapSource; // source image
     float m_heightScale = 30.f;
     int m_terrainMode = 0; // 0 flat, 1 heightmap
+    bool m_userRequestedTerrain = false; // ajout: flag demande rebuild terrain
+    int m_heightmapResolution = 512; // ajout: résolution texture heightmap par défaut
 
     // Raycast GPU
     QVector2D m_mouseNDC{0.f, 0.f}; // Position souris en NDC
     bool m_raycastRequested = false;
-    int m_heightmapResolution = 512; // texture heightmap
-    bool m_userRequestedTerrain = false; // aucune génération avant action utilisateur
 };
 
 #endif // CLAYAPP_GLVIEWPORT_H

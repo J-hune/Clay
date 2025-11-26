@@ -143,21 +143,19 @@ void GLViewport::mouseMoveEvent(QMouseEvent *event) {
 
     // On calcule la position de la souris en NDC pour le raycast
     const QPointF itemPos = mapFromScene(localPos);
-    const float x = static_cast<float>(itemPos.x());
-    const float y = static_cast<float>(itemPos.y());
     const float w_width = static_cast<float>(width());
     const float w_height = static_cast<float>(height());
 
     if (w_width > 0.f && w_height > 0.f) {
-        const float ndcX = (2.0f * x / w_width) - 1.0f;
-        const float ndcY = (2.0f * y / w_height) - 1.0f;
-        m_mouseNDC = QVector2D(ndcX, ndcY);
+        m_mouseNDC = QVector2D(
+            (2.0f * itemPos.x() / w_width) - 1.0f,
+            (2.0f * itemPos.y() / w_height) - 1.0f
+        );
         m_raycastRequested = true;
+        update();
     } else {
-        qWarning("GLViewport::mouseMoveEvent : largeur/hauteur invalide pour le calcul NDC");
+        qWarning("GLViewport::mouseMoveEvent : dimensions invalides pour NDC");
     }
-
-    update();
 }
 
 void GLViewport::mouseReleaseEvent(QMouseEvent *event) {
@@ -174,6 +172,28 @@ void GLViewport::wheelEvent(QWheelEvent *event) {
     if (speedChanged) emit cameraSpeedChanged();
     if (distChanged) emit orbitDistanceChanged();
     if (speedChanged || distChanged) update();
+}
+
+// Event de déplacement de la souris (sans bouton appuyé)
+void GLViewport::hoverMoveEvent(QHoverEvent *event) {
+    const float w_width = static_cast<float>(width());
+    const float w_height = static_cast<float>(height());
+
+    if (w_width > 0.f && w_height > 0.f) {
+        // Utiliser la position locale de l'événement hover
+        const QPointF localPosF = event->position();
+        const QVector2D newNDC(
+            (2.0f * localPosF.x() / w_width) - 1.0f,
+            (2.0f * localPosF.y() / w_height) - 1.0f
+        );
+        if ((newNDC - m_mouseNDC).lengthSquared() > 1e-6f) {
+            m_mouseNDC = newNDC;
+            m_raycastRequested = true;
+            update();
+        }
+    } else {
+        qWarning("GLViewport::hoverMoveEvent : dimensions invalides pour NDC");
+    }
 }
 
 // Renderer OpenGL
