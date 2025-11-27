@@ -124,7 +124,7 @@ private:
     bool m_terrainReady = false;
     int m_terrainRevision = 0; // incrémenté à chaque génération pour forcer re-upload
     QUrl m_heightmapSource; // source image
-    float m_heightScale = 30.f;
+    float m_heightScale = 50.f;
     int m_terrainMode = 0; // 0 flat, 1 heightmap
     bool m_userRequestedTerrain = false; // ajout: flag demande rebuild terrain
     int m_heightmapResolution = 512; // ajout: résolution texture heightmap par défaut

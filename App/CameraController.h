@@ -60,6 +60,23 @@ public:
 
     // Entrées souris
     void handleMousePress(const QMouseEvent *e, QQuickWindow *window) {
+        // Gestion du double‑clic molette d'abord
+        if (e->button() == Qt::MiddleButton) {
+            const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+            const QPoint pos = e->position().toPoint();
+
+            if (nowMs - m_lastMiddleClickMs <= kDoubleClickThresholdMs &&
+                (pos - m_lastMiddleClickPos).manhattanLength() <= kDoubleClickMaxDistance) {
+                handleMiddleButtonDoubleClick(window);
+                m_lastMiddleClickMs = 0; // reset pour éviter tripple‑clic en chaîne
+                return;
+            }
+
+            // On mémorise ce clic comme potentiel premier clic
+            m_lastMiddleClickMs = nowMs;
+            m_lastMiddleClickPos = pos;
+        }
+
         if (e->button() == Qt::RightButton) {
             m_rightButtonDown = true;
             m_mode = Mode::Fps;
@@ -69,6 +86,7 @@ public:
             m_lastGlobalPos = window->mapFromGlobal(QCursor::pos());
             window->setCursor(QCursor(Qt::BlankCursor));
         } else if (e->button() == Qt::MiddleButton) {
+            // Clic molette simple : drag d'orbite
             m_middleButtonDown = true;
             m_mode = Mode::Orbit;
             m_lastMousePos = e->position().toPoint();
@@ -159,6 +177,12 @@ private:
     QPoint m_mouseDelta{0, 0};
     QPoint m_lastGlobalPos;
 
+    // Détection double‑clic molette
+    qint64 m_lastMiddleClickMs = 0;
+    QPoint m_lastMiddleClickPos;
+    static constexpr int kDoubleClickThresholdMs = 350;
+    static constexpr int kDoubleClickMaxDistance = 6;
+
     // Mode courant
     Mode m_mode = Mode::Orbit;
 
@@ -175,7 +199,7 @@ private:
 
     // Méthodes supplémentaires
     void handleCursorWrap(const QPoint &localPos, const QRect &rect, const QQuickWindow *w) {
-        if (localPos.y() < rect.top()) {
+        if (localPos.y() <= rect.top()) {
             QCursor::setPos(w->mapToGlobal(QPoint(localPos.x(), rect.bottom() - 1)));
             m_lastMousePos.setY(rect.height());
         } else if (localPos.y() >= rect.bottom()) {
@@ -183,7 +207,7 @@ private:
             m_lastMousePos.setY(0);
         }
 
-        if (localPos.x() < rect.left()) {
+        if (localPos.x() <= rect.left()) {
             QCursor::setPos(w->mapToGlobal(QPoint(rect.right() - 1, localPos.y())));
             m_lastMousePos.setX(rect.width());
         } else if (localPos.x() >= rect.right()) {
@@ -252,6 +276,11 @@ private:
         } else {
             m_mode = Mode::Orbit;
         }
+    }
+
+    void handleMiddleButtonDoubleClick(QQuickWindow *window) {
+        Q_UNUSED(window);
+        m_camera.setOrbitPivot(QVector3D(0.f, 1.8f, 0.f));
     }
 };
 

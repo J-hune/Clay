@@ -40,7 +40,7 @@ private:
     int m_gridResX = 256;
     int m_gridResZ = 256;
     int m_texRes = 512;
-    float m_heightScale = 30.f;
+    float m_heightScale = 50.f;
 
     bool m_dirtyMesh = true;
     bool m_dirtyTexture = true;
