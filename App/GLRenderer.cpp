@@ -15,6 +15,8 @@ GLRenderer::GLRenderer(GLViewport *viewport) : m_viewport(viewport) {
     m_timer.start();
     m_terrainGpu.initialize(this);
     m_raycastController.initialize(this);
+    m_brushManager.initialize(this);
+    m_brushManager.loadFromDirectory(this, QStringLiteral("brushes"));
 }
 
 void GLRenderer::synchronize(QQuickFramebufferObject *item) {
@@ -26,6 +28,7 @@ void GLRenderer::synchronize(QQuickFramebufferObject *item) {
 
     syncViewportState();
     syncTerrain();
+    syncBrushState();
     syncInteractionState();
 }
 
@@ -41,6 +44,11 @@ void GLRenderer::syncViewportState() {
     // Flags affichage
     m_drawGrid = m_viewport->drawGrid();
     m_drawAxes = m_viewport->drawAxes();
+
+    // Synchronisation des paramètres de brush vers le BrushManager
+    m_brushManager.setCurrentBrushIndex(m_viewport->brushIndex());
+    m_brushManager.setBrushSize(m_viewport->brushSize());
+    m_brushManager.setBrushStrength(m_viewport->brushStrength());
 
     // Détection des changements
     if (m_prevGridResolution != m_grid.resolution() ||
@@ -89,6 +97,23 @@ void GLRenderer::syncTerrain() {
     }
 }
 
+void GLRenderer::syncBrushState() {
+    if (!m_viewport) return;
+
+    if (m_brushManager.brushCount() <= 0) {
+        m_brushManager.setCurrentBrushIndex(-1);
+    } else if (!m_brushManager.isValidBrushIndex(m_brushManager.currentBrushIndex())) {
+        m_brushManager.setCurrentBrushIndex(0);
+    }
+
+    // Propager les paramètres de brush vers le GPU terrain
+    m_terrainGpu.setBrushPreview(
+        m_brushManager.currentBrushIndex(),
+        m_brushManager.brushSize(),
+        m_brushManager.brushStrength()
+    );
+}
+
 void GLRenderer::syncInteractionState() {
     if (!m_viewport) return;
 
@@ -104,6 +129,8 @@ void GLRenderer::render() {
 
     bool cameraDirty = false;
     updateCamera(dt, cameraDirty);
+
+    applyPendingStrokes();
 
     if (!shouldRenderFrame(cameraDirty)) {
         return;
@@ -195,6 +222,7 @@ void GLRenderer::drawScene(const QMatrix4x4 &proj, const QMatrix4x4 &view) {
     m_grid.draw(this, m_drawGrid, m_drawAxes);
 
     if (m_terrainReady) {
+        m_terrainGpu.setBrushTextureArray(m_brushManager.brushTextureArrayId());
         m_terrainGpu.draw(this, proj, view);
     }
 }
@@ -224,11 +252,22 @@ void GLRenderer::processRaycast(const QMatrix4x4 &proj, const QMatrix4x4 &view) 
 
         if (m_raycastController.hasHit()) {
             m_terrainGpu.setRaycastHit(m_raycastController.hitPosition());
+            // TODO: plus tard, on pourra utiliser cette position pour le preview de brush
             requestRedraw(RedrawReason::RaycastChanged);
         } else {
             m_terrainGpu.clearRaycastHit();
         }
     }
+}
+
+void GLRenderer::applyPendingStrokes() {
+    if (!m_terrainReady) return;
+
+    const auto &strokes = m_brushManager.pendingStrokes();
+    if (strokes.empty()) return;
+
+    // TODO: dans une itération suivante, appeler un compute shader dans TerrainGpu
+    m_brushManager.clearPendingStrokes();
 }
 
 void GLRenderer::finalizeFrame() {

@@ -4,19 +4,21 @@
 #include "Log.h"
 
 static const char *kVS = R"GLSL(
-#version 120
-attribute vec2 aUV;
+#version 440 core
+layout(location = 0) in vec2 aUV;
+
 uniform sampler2D uHeight;
 uniform mat4 uMVP;
 uniform float uHeightScale;
-// Varyings
-varying float vHeight;
-varying vec2 vUV;
-varying vec3 vWorldPos;
+
+out float vHeight;
+out vec2 vUV;
+out vec3 vWorldPos;
+
 void main() {
     vec2 worldSize = vec2(100.0, 100.0); // taille fixe
     vUV = aUV;
-    float h = texture2D(uHeight, aUV).r * uHeightScale;
+    float h = texture(uHeight, aUV).r * uHeightScale;
     vHeight = h;
     vec2 posXZ = (aUV - vec2(0.5)) * worldSize;
     vWorldPos = vec3(posXZ.x, h, posXZ.y);
@@ -25,23 +27,33 @@ void main() {
 )GLSL";
 
 static const char *kFS = R"GLSL(
-#version 120
+#version 440 core
+
 uniform sampler2D uHeight;
 uniform float uHeightScale;
 uniform float uTexSize; // résolution de la heightmap
 uniform vec3 uHitPos; // Position du hit du raycast
 uniform float uHitValid; // 1.0 si hit valide, 0.0 sinon
-varying float vHeight;
-varying vec2 vUV;
-varying vec3 vWorldPos;
+
+// Brush preview
+uniform sampler2DArray uBrushArray;
+uniform int uBrushIndex;
+uniform float uBrushSize;
+uniform float uBrushStrength;
+
+in float vHeight;
+in vec2 vUV;
+in vec3 vWorldPos;
+
+out vec4 fragColor;
 
 // Calcule une normale approchée depuis la texture height (centrée)
 vec3 computeNormal(vec2 uv) {
     float texel = 1.0 / uTexSize;
-    float hL = texture2D(uHeight, uv + vec2(-texel, 0.0)).r * uHeightScale;
-    float hR = texture2D(uHeight, uv + vec2( texel, 0.0)).r * uHeightScale;
-    float hD = texture2D(uHeight, uv + vec2(0.0, -texel)).r * uHeightScale;
-    float hU = texture2D(uHeight, uv + vec2(0.0,  texel)).r * uHeightScale;
+    float hL = texture(uHeight, uv + vec2(-texel, 0.0)).r * uHeightScale;
+    float hR = texture(uHeight, uv + vec2( texel, 0.0)).r * uHeightScale;
+    float hD = texture(uHeight, uv + vec2(0.0, -texel)).r * uHeightScale;
+    float hU = texture(uHeight, uv + vec2(0.0,  texel)).r * uHeightScale;
     // Gradient
     float dx = hR - hL;
     float dz = hU - hD;
@@ -75,18 +87,27 @@ void main() {
     float ambient = 0.35;
     vec3 lit = baseCol * (ambient + diff * 0.65);
 
-    // Visualisation du point de hit en violet (Temporaire: TODO remove)
-    if (uHitValid > 0.5) {
-        float dist = distance(vWorldPos, uHitPos);
-        float highlightRadius = 2; // rayon de la zone violette
-        if (dist < highlightRadius) {
-            float t = smoothstep(highlightRadius, 0.0, dist);
-            vec3 purple = vec3(0.8, 0.2, 1.0);
-            lit = mix(lit, purple, t);
+    // Aperçu du brush : on utilise la texture du brush
+    if (uHitValid > 0.5 && uBrushSize > 0.0 && uBrushIndex >= 0) {
+        // Coordonnées locales [0,1] dans l’espace du brush (plan XZ)
+        vec2 delta = vWorldPos.xz - uHitPos.xz;
+        vec2 local = delta / (uBrushSize * 2.0) + 0.5; // map [-uBrushSize, uBrushSize] → [0,1]
+
+        // si on est dans le carré
+        if (local.x >= 0.0 && local.x <= 1.0 &&
+            local.y >= 0.0 && local.y <= 1.0) {
+
+            float texVal = texture(uBrushArray, vec3(local, float(uBrushIndex))).r;
+
+            // falloff optionnel (non radial)
+            float mask = 1.0; // garde la texture brute
+            // ou un falloff carré : mask = min(1.0 - abs(delta.x)/uBrushSize, 1.0 - abs(delta.y)/uBrushSize);
+
+            lit = mix(lit, vec3(0.627, 0.796, 0.835), texVal * mask * uBrushStrength);
         }
     }
 
-    gl_FragColor = vec4(lit, 1.0);
+    fragColor = vec4(lit, 1.0);
 }
 )GLSL";
 
@@ -290,13 +311,23 @@ void TerrainGpu::draw(QOpenGLFunctions *gl, const QMatrix4x4 &proj, const QMatri
     m_program->setUniformValue("uHeightScale", m_heightScale);
     m_program->setUniformValue("uTexSize", static_cast<float>(m_texRes));
 
-    // Uniforms pour la visualisation du raycast hit
     m_program->setUniformValue("uHitPos", m_hitPos);
     m_program->setUniformValue("uHitValid", m_hitValid ? 1.0f : 0.0f);
+
+    // Uniforms de brush
+    m_program->setUniformValue("uBrushIndex", m_brushIndex);
+    m_program->setUniformValue("uBrushSize", m_brushSize);
+    m_program->setUniformValue("uBrushStrength", m_brushStrength);
 
     gl->glActiveTexture(GL_TEXTURE0);
     gl->glBindTexture(GL_TEXTURE_2D, m_tex);
     m_program->setUniformValue("uHeight", 0);
+
+    if (m_brushArray != 0) {
+        gl->glActiveTexture(GL_TEXTURE1);
+        gl->glBindTexture(GL_TEXTURE_2D_ARRAY, m_brushArray);
+        m_program->setUniformValue("uBrushArray", 1);
+    }
 
     gl->glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
     gl->glEnableVertexAttribArray(0);
@@ -310,5 +341,8 @@ void TerrainGpu::draw(QOpenGLFunctions *gl, const QMatrix4x4 &proj, const QMatri
     gl->glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     gl->glBindTexture(GL_TEXTURE_2D, 0);
+    if (m_brushArray != 0) {
+        gl->glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+    }
     m_program->release();
 }
