@@ -1,0 +1,82 @@
+#ifndef CLAYAPP_CAMERACONTROLLERQML_H
+#define CLAYAPP_CAMERACONTROLLERQML_H
+
+#include <QKeyEvent>
+#include "../CameraController.h"
+
+/**
+ * @brief Wrapper QObject pour CameraController, exposable au QML
+ * Gère tous les événements de la caméra et expose les propriétés
+ */
+class CameraControllerQml : public QObject {
+    Q_OBJECT
+
+    Q_PROPERTY(QVector3D position READ position NOTIFY positionChanged)
+    Q_PROPERTY(float yaw READ yaw NOTIFY yawChanged)
+    Q_PROPERTY(float pitch READ pitch NOTIFY pitchChanged)
+    Q_PROPERTY(float speed READ speed WRITE setSpeed NOTIFY speedChanged)
+    Q_PROPERTY(float mouseSensitivity READ mouseSensitivity WRITE setMouseSensitivity NOTIFY mouseSensitivityChanged)
+    Q_PROPERTY(float orbitDistance READ orbitDistance WRITE setOrbitDistance NOTIFY orbitDistanceChanged)
+    Q_PROPERTY(float speedMin READ speedMin CONSTANT)
+    Q_PROPERTY(float speedMax READ speedMax CONSTANT)
+    Q_PROPERTY(float orbitDistanceMin READ orbitDistanceMin CONSTANT)
+    Q_PROPERTY(float orbitDistanceMax READ orbitDistanceMax CONSTANT)
+    Q_PROPERTY(bool isMovingCamera READ isMovingCamera NOTIFY isMovingCameraChanged)
+
+public:
+    explicit CameraControllerQml(QObject *parent = nullptr);
+
+    // Accès au contrôleur interne (pour GLRenderer)
+    CameraController& controller() { return m_controller; }
+    const CameraController& controller() const { return m_controller; }
+
+    // Getters pour Q_PROPERTY
+    QVector3D position() const { return m_controller.camera().position(); }
+    float yaw() const { return m_controller.camera().yaw(); }
+    float pitch() const { return m_controller.camera().pitch(); }
+    float speed() const { return m_controller.speed(); }
+    float mouseSensitivity() const { return m_controller.mouseSensitivity(); }
+    float orbitDistance() const { return m_controller.orbitDistance(); }
+    float speedMin() const { return m_controller.cameraSpeedMin(); }
+    float speedMax() const { return m_controller.cameraSpeedMax(); }
+    float orbitDistanceMin() const { return m_controller.orbitDistanceMin(); }
+    float orbitDistanceMax() const { return m_controller.orbitDistanceMax(); }
+    bool isMovingCamera() const { return m_controller.isMovingCamera(); }
+
+    // Setters
+    void setSpeed(float s);
+    void setMouseSensitivity(float s);
+    void setOrbitDistance(float d);
+
+    // Méthodes invocables depuis QML
+    Q_INVOKABLE void handleKeyPress(QKeyEvent *event);
+    Q_INVOKABLE void handleKeyRelease(QKeyEvent *event);
+    Q_INVOKABLE void handleMousePress(QMouseEvent *event, QQuickWindow *window);
+    Q_INVOKABLE void handleMouseMove(QMouseEvent *event, QQuickWindow *window, const QPoint &localPos, const QRect &rect);
+    Q_INVOKABLE void handleMouseRelease(QMouseEvent *event, QQuickWindow *window);
+    Q_INVOKABLE void handleWheel(QWheelEvent *event);
+    Q_INVOKABLE void update(float dt);
+
+signals:
+    void positionChanged();
+    void yawChanged();
+    void pitchChanged();
+    void speedChanged();
+    void mouseSensitivityChanged();
+    void orbitDistanceChanged();
+    void isMovingCameraChanged();
+
+private:
+    CameraController m_controller;
+    QVector3D m_lastPosition;
+    float m_lastYaw = -90.0f;
+    float m_lastPitch = 0.0f;
+    float m_lastSpeed = 5.0f;
+    float m_lastOrbitDistance = 5.0f;
+    bool m_lastIsMoving = false;
+
+    void checkAndEmitChanges();
+};
+
+#endif // CLAYAPP_CAMERACONTROLLERQML_H
+

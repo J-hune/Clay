@@ -1,5 +1,9 @@
 #include "GLRenderer.h"
 #include "GLViewport.h"
+#include "qml/CameraControllerQml.h"
+#include "qml/BrushManagerQml.h"
+#include "qml/RaycastControllerQml.h"
+#include "qml/TerrainManagerQml.h"
 #include "TerrainGpu.h"
 #include "CameraController.h"
 #include "Grid.h"
@@ -45,10 +49,13 @@ void GLRenderer::syncViewportState() {
     m_drawGrid = m_viewport->drawGrid();
     m_drawAxes = m_viewport->drawAxes();
 
-    // Synchronisation des paramètres de brush vers le BrushManager
-    m_brushManager.setCurrentBrushIndex(m_viewport->brushIndex());
-    m_brushManager.setBrushSize(m_viewport->brushSize());
-    m_brushManager.setBrushStrength(m_viewport->brushStrength());
+    // Synchronisation des paramètres de brush depuis BrushManagerQml
+    auto* brushQml = m_viewport->brushManagerTyped();
+    if (brushQml) {
+        m_brushManager.setCurrentBrushIndex(brushQml->brushIndex());
+        m_brushManager.setBrushSize(brushQml->brushSize());
+        m_brushManager.setBrushStrength(brushQml->brushStrength());
+    }
 
     // Détection des changements
     if (m_prevGridResolution != m_grid.resolution() ||
@@ -64,34 +71,37 @@ void GLRenderer::syncViewportState() {
 void GLRenderer::syncTerrain() {
     if (!m_viewport) return;
 
-    if (m_viewport->userRequestedTerrain() &&
-        m_viewport->terrainRevision() != m_lastTerrainRevision) {
+    auto* terrainQml = m_viewport->terrainManagerTyped();
+    if (!terrainQml) return;
 
-        m_lastTerrainRevision = m_viewport->terrainRevision();
+    // Vérifier si le terrain a besoin d'être uploadé
+    if (terrainQml->needsUpload() && terrainQml->revision() != m_lastTerrainRevision) {
+        m_lastTerrainRevision = terrainQml->revision();
 
         // Configuration du terrain GPU
-        m_terrainGpu.setGridResolution(m_viewport->terrainResolution(), m_viewport->terrainResolution());
-        m_terrainGpu.setTextureResolution(m_viewport->heightmapResolution());
+        m_terrainGpu.setGridResolution(terrainQml->resolution(), terrainQml->resolution());
+        m_terrainGpu.setTextureResolution(terrainQml->heightmapResolution());
 
         // Reconstruction selon le mode
-        if (m_viewport->terrainMode() == 1 && !m_viewport->heightmapSource().isEmpty()) {
-            const QImage img = loadHeightImage(m_viewport->heightmapSource());
+        if (terrainQml->mode() == 1 && !terrainQml->heightmapSource().isEmpty()) {
+            const QImage img = loadHeightImage(terrainQml->heightmapSource());
             if (!img.isNull()) {
-                m_terrainGpu.rebuild(this, img, m_viewport->heightScale());
-                LOG_INFO() << "Terrain reconstruit (heightmap) - res=" << m_viewport->terrainResolution()
-                           << ", texRes=" << m_viewport->heightmapResolution()
-                           << ", scale=" << m_viewport->heightScale();
+                m_terrainGpu.rebuild(this, img, terrainQml->heightScale());
+                LOG_INFO() << "Terrain reconstruit (heightmap) - res=" << terrainQml->resolution()
+                           << ", texRes=" << terrainQml->heightmapResolution()
+                           << ", scale=" << terrainQml->heightScale();
             } else {
-                m_terrainGpu.rebuildFlat(this, m_viewport->heightScale());
+                m_terrainGpu.rebuildFlat(this, terrainQml->heightScale());
                 LOG_WARN() << "Impossible de charger la heightmap, terrain plat utilisé";
             }
         } else {
-            m_terrainGpu.rebuildFlat(this, m_viewport->heightScale());
-            LOG_INFO() << "Terrain plat reconstruit - res=" << m_viewport->terrainResolution()
-                       << ", texRes=" << m_viewport->heightmapResolution()
-                       << ", scale=" << m_viewport->heightScale();
+            m_terrainGpu.rebuildFlat(this, terrainQml->heightScale());
+            LOG_INFO() << "Terrain plat reconstruit - res=" << terrainQml->resolution()
+                       << ", texRes=" << terrainQml->heightmapResolution()
+                       << ", scale=" << terrainQml->heightScale();
         }
 
+        terrainQml->setNeedsUpload(false);
         m_terrainReady = true;
         requestRedraw(RedrawReason::TerrainChanged);
     }
@@ -117,9 +127,9 @@ void GLRenderer::syncBrushState() {
 void GLRenderer::syncInteractionState() {
     if (!m_viewport) return;
 
-    m_mouseMoved = m_viewport->m_raycastRequested;
-    if (m_mouseMoved) {
-        m_viewport->invalidateRaycast();
+    auto* raycastQml = m_viewport->raycastControllerTyped();
+    if (raycastQml) {
+        m_mouseMoved = true;
     }
 }
 
@@ -169,14 +179,17 @@ void GLRenderer::updateCamera(float dt, bool &cameraDirty) {
         return;
     }
 
-    m_viewport->m_cameraController.update(dt);
-    cameraDirty = m_viewport->m_cameraController.camera().isDirty();
+    auto* cameraQml = m_viewport->cameraControllerTyped();
+    if (!cameraQml) {
+        cameraDirty = false;
+        return;
+    }
+
+    cameraQml->controller().update(dt);
+    cameraDirty = cameraQml->controller().camera().isDirty();
 
     if (cameraDirty) {
-        m_viewport->m_cameraController.camera().clearDirty();
-        emit m_viewport->cameraPositionChanged();
-        emit m_viewport->yawChanged();
-        emit m_viewport->pitchChanged();
+        cameraQml->controller().camera().clearDirty();
     }
 }
 
@@ -199,7 +212,8 @@ void GLRenderer::computeMatrices(QMatrix4x4 &proj, QMatrix4x4 &view) {
     updateProjectionMatrix(w, h, proj);
 
     if (m_viewport) {
-        updateViewMatrix(m_viewport->m_cameraController.camera(), view);
+        auto* cameraQml = m_viewport->cameraControllerTyped();
+        if (cameraQml) updateViewMatrix(cameraQml->controller().camera(), view);
     }
 }
 
@@ -230,32 +244,39 @@ void GLRenderer::drawScene(const QMatrix4x4 &proj, const QMatrix4x4 &view) {
 void GLRenderer::processRaycast(const QMatrix4x4 &proj, const QMatrix4x4 &view) {
     if (!m_terrainReady || !m_viewport) return;
 
+    auto* cameraQml = m_viewport->cameraControllerTyped();
+    auto* raycastQml = m_viewport->raycastControllerTyped();
+    auto* terrainQml = m_viewport->terrainManagerTyped();
+
+    if (!cameraQml || !raycastQml || !terrainQml) return;
+
     // Si la caméra bouge, on réinitialise le raycast
-    if (m_viewport->m_cameraController.isMovingCamera()) {
+    if (cameraQml->isMovingCamera()) {
         m_terrainGpu.clearRaycastHit();
         m_raycastController.reset();
-        m_viewport->invalidateRaycast();
+        raycastQml->reset();
         return;
     }
 
-    // Sinon, si la souris a bougé, on effectue le raycast
+    // Sinon, on effectue le raycast
     if (m_mouseMoved) {
-        m_raycastController.updateMousePosition(m_viewport->m_mouseNDC);
+        m_raycastController.updateMousePosition(raycastQml->mouseNDC());
         m_raycastController.perform(
             this,
             proj,
             view,
             m_terrainGpu.heightmapTexture(),
-            m_viewport->heightmapResolution(),
-            m_viewport->heightScale()
+            terrainQml->heightmapResolution(),
+            terrainQml->heightScale()
         );
 
         if (m_raycastController.hasHit()) {
             m_terrainGpu.setRaycastHit(m_raycastController.hitPosition());
-            // TODO: plus tard, on pourra utiliser cette position pour le preview de brush
+            raycastQml->notifyRaycastComplete();
             requestRedraw(RedrawReason::RaycastChanged);
         } else {
             m_terrainGpu.clearRaycastHit();
+            raycastQml->notifyRaycastComplete();
         }
     }
 }
