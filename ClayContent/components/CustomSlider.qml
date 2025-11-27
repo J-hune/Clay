@@ -10,9 +10,15 @@ FocusScope {
     property real stepSize: 1
     property string label: ""
     property int decimals: 1
-    property color backgroundColor: "#2e3136"
-    property color fillColor: "#bf5934"
+    property color backgroundColor: "#23262b"
+    property color primaryColor: "#bf5934"
     property color textColor: "white"
+
+    // Couleurs dérivées automatiquement
+    readonly property color fillColor: primaryColor
+    readonly property color borderColor: Qt.lighter(primaryColor, 1.2)
+    readonly property color borderColorActive: primaryColor
+    readonly property color borderColorHover: Qt.lighter(primaryColor, 1.1)
 
     implicitHeight: 28
 
@@ -22,8 +28,11 @@ FocusScope {
         color: root.backgroundColor
         radius: 6
         border.width: 1
-        border.color: dragArea.dragging ? "#bf5934" : "#52555b"
+        border.color: dragArea.dragging ? root.borderColorActive :
+                      (dragArea.containsMouse ? root.borderColorHover : Qt.darker(root.borderColor, 1.5))
         clip: true
+
+        Behavior on border.color { ColorAnimation { duration: 100 } }
 
         // Rectangle de remplissage avec masque arrondi
         Rectangle {
