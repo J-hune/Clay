@@ -94,20 +94,6 @@ Rectangle {
             anchors.rightMargin: vScrollBar.width + 4
             spacing: 10
 
-            // ═══════════════════════════════════════════
-            // SECTION: TERRAIN
-            // ═══════════════════════════════════════════
-            TerrainSection {
-                width: parent.width
-                terrainManager: rightBar.terrainManager
-            }
-
-            // Séparateur
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: "#3a3d42"
-            }
 
             // ═══════════════════════════════════════════
             // SECTION: BRUSH
