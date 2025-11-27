@@ -25,3 +25,9 @@ void BrushManagerQml::setBrushStrength(float strength) {
 void BrushManagerQml::enqueueStroke(const QVector3D &worldPos) {
     m_manager.enqueueStroke(worldPos);
 }
+
+void BrushManagerQml::refreshBrushModel(const BrushManager &manager) {
+    m_brushModel.updateFromManager(manager);
+    emit brushCountChanged();
+    emit brushModelChanged();
+}
