@@ -2,6 +2,7 @@
 #define CLAYAPP_BRUSHMANAGERQML_H
 
 #include "../BrushManager.h"
+#include "BrushListModel.h"
 
 /**
  * @brief Wrapper QObject pour BrushManager, exposable au QML
@@ -14,6 +15,7 @@ class BrushManagerQml : public QObject {
     Q_PROPERTY(float brushSize READ brushSize WRITE setBrushSize NOTIFY brushSizeChanged)
     Q_PROPERTY(float brushStrength READ brushStrength WRITE setBrushStrength NOTIFY brushStrengthChanged)
     Q_PROPERTY(int brushCount READ brushCount NOTIFY brushCountChanged)
+    Q_PROPERTY(BrushListModel* brushModel READ brushModel NOTIFY brushModelChanged)
 
 public:
     explicit BrushManagerQml(QObject *parent = nullptr);
@@ -26,7 +28,8 @@ public:
     int brushIndex() const { return m_manager.currentBrushIndex(); }
     float brushSize() const { return m_manager.brushSize(); }
     float brushStrength() const { return m_manager.brushStrength(); }
-    int brushCount() const { return m_manager.brushCount(); }
+    int brushCount() const { return m_brushModel.rowCount(); }
+    BrushListModel* brushModel() { return &m_brushModel; }
 
     // Setters
     void setBrushIndex(int index);
@@ -36,14 +39,19 @@ public:
     // Méthodes invocables depuis QML
     Q_INVOKABLE void enqueueStroke(const QVector3D &worldPos);
 
+    // Appelé par GLRenderer après loadFromDirectory pour mettre à jour le modèle
+    void refreshBrushModel(const BrushManager &manager);
+
 signals:
     void brushIndexChanged();
     void brushSizeChanged();
     void brushStrengthChanged();
     void brushCountChanged();
+    void brushModelChanged();
 
 private:
     BrushManager m_manager;
+    BrushListModel m_brushModel;
 };
 
 #endif // CLAYAPP_BRUSHMANAGERQML_H

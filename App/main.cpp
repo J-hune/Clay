@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QFontDatabase>
 #include <QQmlApplicationEngine>
 
 #include "GLViewport.h"
@@ -13,6 +14,30 @@ int main(int argc, char *argv[]) {
     set_qt_environment();
     QApplication app(argc, argv);
     Log::setLevel(Log::Level::Debug);
+
+    // Chargement des fonts Open Sans
+    int fontIdRegular = QFontDatabase::addApplicationFont(":/qt/qml/ClayContent/fonts/OpenSans-Regular.ttf");
+    int fontIdSemiBold = QFontDatabase::addApplicationFont(":/qt/qml/ClayContent/fonts/OpenSans-SemiBold.ttf");
+
+    if (fontIdRegular != -1) {
+        QStringList fontFamilies = QFontDatabase::applicationFontFamilies(fontIdRegular);
+        if (!fontFamilies.isEmpty()) {
+            QString family = fontFamilies.at(0);
+            QFont defaultFont(family);
+            QApplication::setFont(defaultFont);
+            LOG_INFO() << "Font par défaut définie: " << family.toStdString();
+        } else {
+            LOG_WARN() << "Familles de font trouvées mais vide";
+        }
+    } else {
+        LOG_WARN() << "Impossible de charger la font Open Sans Regular, utilisation de la font système";
+    }
+
+    if (fontIdSemiBold != -1) {
+        LOG_INFO() << "Font Open Sans SemiBold chargée avec succès";
+    } else {
+        LOG_WARN() << "Impossible de charger la font Open Sans SemiBold";
+    }
 
     qmlRegisterType<GLViewport>("MyGL", 1, 0, "GLViewport");
     qmlRegisterType<CameraControllerQml>("MyGL", 1, 0, "CameraController");

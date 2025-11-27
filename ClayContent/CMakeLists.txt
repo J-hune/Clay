@@ -16,6 +16,8 @@ qt6_add_qml_module(ClayContent
         "images/magnifying-glass-plus.svg"
         "images/person-running.svg"
         "images/layer-plus.svg"
+        "fonts/OpenSans-Regular.ttf"
+        "fonts/OpenSans-SemiBold.ttf"
 )
 
 

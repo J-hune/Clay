@@ -52,6 +52,12 @@ void GLRenderer::syncViewportState() {
     // Synchronisation des paramètres de brush depuis BrushManagerQml
     auto* brushQml = m_viewport->brushManagerTyped();
     if (brushQml) {
+        // Rafraîchir le modèle de brushes une fois que les brushes sont chargés
+        if (!m_brushModelRefreshed && m_brushManager.brushCount() > 0) {
+            brushQml->refreshBrushModel(m_brushManager);
+            m_brushModelRefreshed = true;
+        }
+
         m_brushManager.setCurrentBrushIndex(brushQml->brushIndex());
         m_brushManager.setBrushSize(brushQml->brushSize());
         m_brushManager.setBrushStrength(brushQml->brushStrength());

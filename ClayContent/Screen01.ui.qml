@@ -7,6 +7,7 @@ Check out https://doc.qt.io/qtcreator/creator-quick-ui-forms.html for details on
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
+import QtQuick.Effects
 import Clay
 
 // Pour ouvrir le projet sur Qt Design Studio, il faut commenter l'import suivant
@@ -99,11 +100,17 @@ Rectangle {
             padding: 12
             contentItem: Column {
                 spacing: 8
-                Text { text: "Génération Terrain"; font.pixelSize: 16; color: "white" }
-                Rectangle { height: 1; width: parent.width; color: "#333" }
+                Text {
+                    text: "Génération Terrain"; font.pixelSize: 16; color: "white"
+                }
+                Rectangle {
+                    height: 1; width: parent.width; color: "#333"
+                }
                 Row {
                     spacing: 6
-                    Text { text: "Mode:"; color: "white" }
+                    Text {
+                        text: "Mode:"; color: "white"
+                    }
                     ComboBox {
                         id: modeCombo
                         model: ["Plat", "Heightmap"]
@@ -114,21 +121,30 @@ Rectangle {
                 }
                 Row {
                     spacing: 6
-                    Text { text: "HeightScale:"; color: "white" }
+                    Text {
+                        text: "HeightScale:"; color: "white"
+                    }
                     Slider {
                         id: heightScaleSlider
-                        from: 0; to: 200; stepSize: 1
+                        from: 0;
+                        to: 200; stepSize: 1
                         value: terrainManager.heightScale
                         onValueChanged: terrainManager.heightScale = value
                         width: 120
                     }
-                    Text { text: Math.round(terrainManager.heightScale); color: "#ccc" }
+                    Text {
+                        text: Math.round(terrainManager.heightScale); color: "#ccc"
+                    }
                 }
                 Row {
                     spacing: 6
                     visible: terrainManager.mode === 1
-                    Button { text: "Image..."; onClicked: fileDialog.open() }
-                    Text { text: terrainManager.heightmapSource.toString().length > 0 ? terrainManager.heightmapSource.toString().split('/').pop() : "(Aucune)"; color: "#ccc"; elide: Text.ElideRight; width: 110 }
+                    Button {
+                        text: "Image..."; onClicked: fileDialog.open()
+                    }
+                    Text {
+                        text: terrainManager.heightmapSource.toString().length > 0 ? terrainManager.heightmapSource.toString().split('/').pop() : "(Aucune)"; color: "#ccc"; elide: Text.ElideRight; width: 110
+                    }
                 }
                 FileDialog {
                     id: fileDialog
@@ -141,10 +157,16 @@ Rectangle {
                     text: terrainManager.ready ? "Régénérer" : "Générer"
                     onClicked: terrainManager.generate()
                 }
-                Text { text: terrainManager.ready ? ("Triangles: " + terrainManager.triangleCount) : "Terrain non prêt"; color: "#ccc"; font.pixelSize: 12 }
-                Button { text: "Fermer"; onClicked: terrainPopup.close() }
+                Text {
+                    text: terrainManager.ready ? ("Triangles: " + terrainManager.triangleCount) : "Terrain non prêt"; color: "#ccc"; font.pixelSize: 12
+                }
+                Button {
+                    text: "Fermer"; onClicked: terrainPopup.close()
+                }
             }
-            background: Rectangle { radius: 6; color: "#212429"; border.color: "#444"; border.width: 1 }
+            background: Rectangle {
+                radius: 6; color: "#212429"; border.color: "#444"; border.width: 1
+            }
         }
     }
 
@@ -192,16 +214,19 @@ Rectangle {
             property real minVal: cameraController.speedMin
             property real maxVal: cameraController.speedMax
             property int timeoutMs: 2000
+
             function ratio() {
                 // min -> 1, max -> 0
                 var span = maxVal - minVal;
                 if (span <= 0) return 1;
                 return (value - minVal) / span;
             }
+
             function showTemp() {
                 visible = true;
                 hideTimer.restart();
             }
+
             Rectangle {
                 id: speedFill
                 anchors.left: parent.left
@@ -222,7 +247,10 @@ Rectangle {
                 source: "images/person-running.svg"
                 fillMode: Image.PreserveAspectFit
             }
-            Timer { id: hideTimer; interval: speedBar.timeoutMs; running: false; repeat: false; onTriggered: speedBar.visible = false }
+            Timer {
+                id:
+                    hideTimer; interval: speedBar.timeoutMs; running: false; repeat: false; onTriggered: speedBar.visible = false
+            }
             // Mise à jour continue
             onValueChanged: speedFill.height = height * ratio()
         }
@@ -246,15 +274,18 @@ Rectangle {
             property real minVal: cameraController.orbitDistanceMin
             property real maxVal: cameraController.orbitDistanceMax
             property int timeoutMs: 2000
+
             function ratio() {
                 var span = maxVal - minVal;
                 if (span <= 0) return 1;
                 return 1 - (value - minVal) / span;
             }
+
             function showTemp() {
                 visible = true;
                 hideTimer2.restart();
             }
+
             Rectangle {
                 id: distanceFill
                 anchors.left: parent.left
@@ -276,7 +307,10 @@ Rectangle {
                 fillMode: Image.PreserveAspectFit
             }
 
-            Timer { id: hideTimer2; interval: distanceBar.timeoutMs; running: false; repeat: false; onTriggered: distanceBar.visible = false }
+            Timer {
+                id:
+                    hideTimer2; interval: distanceBar.timeoutMs; running: false; repeat: false; onTriggered: distanceBar.visible = false
+            }
             onValueChanged: distanceFill.height = height * ratio()
         }
 
@@ -346,7 +380,11 @@ Rectangle {
             anchors.left: parent.left
             anchors.bottom: parent.bottom
             color: "#272a2f"
-            Behavior on color { ColorAnimation { duration: 100 } }
+            Behavior on color {
+                ColorAnimation {
+                    duration: 100
+                }
+            }
 
             MouseArea {
                 id: rightDragArea
@@ -391,130 +429,349 @@ Rectangle {
             }
         }
 
-        Column {
-            id: controlColumn
+        ScrollView {
+            id: scrollView
             anchors.fill: parent
-            anchors.margins: 12
-            spacing: 10
+            anchors.leftMargin: 12
+            clip: true
 
-            // Contrôle sensibilité souris
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
             Column {
-                spacing: 2
-                Text {
-                    text: "Sensibilité souris: " + cameraController.mouseSensitivity.toFixed(2)
-                    color: "white"
-                    font.pixelSize: 14
-                }
-                Row {
-                    spacing: 6
-                    Slider {
-                        id: sensSlider
-                        from: 0; to: 1; stepSize: 0.01
-                        value: cameraController.mouseSensitivity
-                        onValueChanged: cameraController.mouseSensitivity = value
-                        width: 160
+                id: controlColumn
+                width: scrollView.width - scrollView.effectiveScrollBarWidth - 4
+                topPadding: 10
+                bottomPadding: 10
+                spacing: 10
+
+                // ═══════════════════════════════════════════
+                // SECTION: CAMÉRA & AFFICHAGE
+                // ═══════════════════════════════════════════
+                Rectangle {
+                    width: parent.width
+                    height: cameraSection.height
+                    color: "transparent"
+
+                    Column {
+                        id: cameraSection
+                        width: parent.width
+                        spacing: 8
+
+                        // Header section
+                        Text {
+                            text: "Caméra & Affichage"
+                            color: "#bf5934"
+                            font.pixelSize: 16
+                            font.weight: Font.DemiBold
+                        }
+
+                        // Sensibilité souris
+                        Column {
+                            width: parent.width
+                            spacing: 4
+                            Text {
+                                text: "Sensibilité souris: " + cameraController.mouseSensitivity.toFixed(2)
+                                color: "white"
+                                font.pixelSize: 13
+                            }
+                            Row {
+                                width: parent.width
+                                spacing: 6
+                                Slider {
+                                    id: sensSlider
+                                    from: 0;
+                                    to: 1; stepSize: 0.01
+                                    value: cameraController.mouseSensitivity
+                                    onValueChanged: cameraController.mouseSensitivity = value
+                                    width: parent.width - 40
+                                }
+                                Button {
+                                    width: 32; height: 32
+                                    icon.height: 16; icon.width: 16
+                                    icon.source: "images/arrow-rotate-left.svg"
+                                    onClicked: cameraController.mouseSensitivity = rightBar.initialMouseSensitivity
+                                }
+                            }
+                        }
+
+                        // Résolution grille
+                        Column {
+                            width: parent.width
+                            spacing: 4
+                            Text {
+                                text: "Résolution grille: " + glView.gridResolution
+                                color: "white"
+                                font.pixelSize: 13
+                            }
+                            Row {
+                                width: parent.width
+                                spacing: 6
+                                Slider {
+                                    id: gridSlider
+                                    from: 1;
+                                    to: 500; stepSize: 1
+                                    value: glView.gridResolution
+                                    onValueChanged: glView.gridResolution = Math.round(value)
+                                    width: parent.width - 40
+                                }
+                                Button {
+                                    width: 32; height: 32
+                                    icon.source: "images/arrow-rotate-left.svg"
+                                    icon.height: 16; icon.width: 16
+                                    onClicked: glView.gridResolution = rightBar.initialGridResolution
+                                }
+                            }
+                        }
+
+                        // Switches grille et axes
+                        Row {
+                            spacing: Math.max(12, (parent.width - 200) / 2)
+                            Switch {
+                                id: gridSwitch
+                                text: "Grille"
+                                checked: glView.drawGrid
+                                Material.accent: "#bf5934"
+                                onToggled: { glView.drawGrid = checked; glView.update(); }
+                            }
+                            Switch {
+                                id: axesSwitch
+                                text: "Axes"
+                                checked: glView.drawAxes
+                                Material.accent: "#bf5934"
+                                onToggled: { glView.drawAxes = checked; glView.update(); }
+                            }
+                        }
                     }
-                    Button {
-                        icon.height: 16; icon.width: 16
-                        icon.source: "images/arrow-rotate-left.svg"
-                        onClicked: cameraController.mouseSensitivity = rightBar.initialMouseSensitivity
+                }
+
+                // Séparateur
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: "#3a3d42"
+                }
+
+                // ═══════════════════════════════════════════
+                // SECTION: TERRAIN
+                // ═══════════════════════════════════════════
+                Rectangle {
+                    width: parent.width
+                    height: terrainSection.height
+                    color: "transparent"
+
+                    Column {
+                        id: terrainSection
+                        width: parent.width
+                        spacing: 8
+
+                        // Header section
+                        Text {
+                            text: "Terrain"
+                            color: "#bf5934"
+                            font.pixelSize: 16
+                            font.weight: Font.DemiBold
+                        }
+
+                        // Résolution terrain
+                        Column {
+                            width: parent.width
+                            spacing: 4
+                            Text {
+                                text: "Résolution (densité): " + terrainManager.resolution
+                                color: "white"
+                                font.pixelSize: 13
+                            }
+                            Slider {
+                                width: parent.width
+                                from: 2;
+                                to: 1024; stepSize: 1
+                                value: terrainManager.resolution
+                                onValueChanged: terrainManager.resolution = Math.round(value)
+                                onPressedChanged: if (!pressed) terrainManager.generate()
+                            }
+                        }
+
+                        // Résolution heightmap
+                        Column {
+                            width: parent.width
+                            spacing: 4
+                            Text {
+                                text: "Résolution heightmap: " + terrainManager.heightmapResolution
+                                color: "white"
+                                font.pixelSize: 13
+                            }
+                            ComboBox {
+                                width: Math.min(160, parent.width)
+                                model: [512, 1024, 2048, 4096]
+                                currentIndex: model.indexOf(terrainManager.heightmapResolution)
+                                onActivated: terrainManager.heightmapResolution = parseInt(currentText)
+                            }
+                        }
                     }
                 }
-            }
-            // Contrôle résolution grille
-            Column {
-                spacing: 2
-                Text {
-                    text: "Résolution grille: " + glView.gridResolution
-                    color: "white"
-                    font.pixelSize: 14
+
+                // Séparateur
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: "#3a3d42"
                 }
-                Row {
-                    spacing: 8
-                    Slider {
-                        id: gridSlider
-                        from: 1; to: 500; stepSize: 1
-                        value: glView.gridResolution
-                        onValueChanged: glView.gridResolution = Math.round(value)
-                        width: 140
+
+                // ═══════════════════════════════════════════
+                // SECTION: BRUSH
+                // ═══════════════════════════════════════════
+                Rectangle {
+                    width: parent.width
+                    height: brushSection.height
+                    color: "transparent"
+
+                    Column {
+                        id: brushSection
+                        width: parent.width
+                        spacing: 8
+
+                        // Header section
+                        Row {
+                            width: parent.width
+                            spacing: 8
+                            Text {
+                                text: "Brush"
+                                color: "#bf5934"
+                                font.pixelSize: 16
+                                font.weight: Font.DemiBold
+                            }
+                            Text {
+                                anchors.bottom: parent.bottom
+                                text: brushManager.brushCount > 0 ?
+                                    brushManager.brushModel.data(brushManager.brushModel.index(brushManager.brushIndex, 0), 258) :
+                                    "None"
+                                color: "#aaa"
+                                font.pixelSize: 12
+                                font.italic: true
+                            }
+                        }
+
+                        // Grille de brushes responsive
+                        Flow {
+                            id: brushFlow
+                            width: parent.width
+                            spacing: 6
+
+                            Repeater {
+                                id: brushRepeater
+                                model: brushManager.brushCount
+
+                                Rectangle {
+                                    width: 64
+                                    height: 64
+                                    color: brushManager.brushIndex === index ? "#bf5934" : "#333"
+                                    radius: 6
+                                    border.color: brushManager.brushIndex === index ? "#ff8855" : "#555"
+                                    border.width: brushManager.brushIndex === index ? 2 : 1
+
+                                    property string brushFilePath: brushManager.brushModel.data(brushManager.brushModel.index(index, 0), 259)
+                                    property string brushName: brushManager.brushModel.data(brushManager.brushModel.index(index, 0), 258)
+
+                                    Image {
+                                        id: brushImage
+                                        anchors.fill: parent
+                                        anchors.margins: 5
+                                        source: "file://" + parent.brushFilePath
+                                        fillMode: Image.PreserveAspectFit
+                                        smooth: true
+                                        visible: false
+                                    }
+
+                                    MultiEffect {
+                                        source: brushImage
+                                        anchors.fill: brushImage
+                                        maskEnabled: true
+                                        maskSource: mask
+                                    }
+
+                                    Item {
+                                        id: mask
+                                        width: brushImage.width
+                                        height: brushImage.height
+                                        layer.enabled: true
+                                        visible: false
+
+                                        Rectangle {
+                                            width: brushImage.width
+                                            height: brushImage.height
+                                            radius: 6
+                                            color: "black"
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: brushMouseArea
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        hoverEnabled: true
+                                        onClicked: brushManager.brushIndex = index
+                                    }
+                                }
+                            }
+                        }
+
+                        // Brush size
+                        Column {
+                            width: parent.width
+                            spacing: 4
+                            Text {
+                                text: "Taille: " + brushManager.brushSize.toFixed(1)
+                                color: "white"
+                                font.pixelSize: 13
+                            }
+                            Slider {
+                                id: brushSizeSlider
+                                width: parent.width
+                                from: 0.1;
+                                to: 10; stepSize: 0.1
+                                value: brushManager.brushSize
+                                onValueChanged: brushManager.brushSize = value
+                            }
+                        }
+
+                        // Brush strength
+                        Column {
+                            width: parent.width
+                            spacing: 4
+                            Text {
+                                text: "Intensité: " + brushManager.brushStrength.toFixed(2)
+                                color: "white"
+                                font.pixelSize: 13
+                            }
+                            Slider {
+                                id: brushStrengthSlider
+                                width: parent.width
+                                from: 0.0;
+                                to: 5.0; stepSize: 0.05
+                                value: brushManager.brushStrength
+                                onValueChanged: brushManager.brushStrength = value
+                            }
+                        }
                     }
-                    Button {
-                        icon.source: "images/arrow-rotate-left.svg"
-                        icon.height: 16; icon.width: 16
-                        onClicked: glView.gridResolution = rightBar.initialGridResolution
-                    }
                 }
-            }
-            Row {
-                // Switch grille / axes
-                spacing: 24
-                Switch {
-                    id: gridSwitch
-                    text: "Grille"
-                    checked: glView.drawGrid
-                    Material.accent: "#bf5934"
-                    onToggled: { glView.drawGrid = checked; glView.update(); }
-                }
-                Switch {
-                    id: axesSwitch
-                    text: "Axes"
-                    checked: glView.drawAxes
-                    Material.accent: "#bf5934"
-                    onToggled: { glView.drawAxes = checked; glView.update(); }
-                }
-            }
-            Rectangle {
-                height: 2
-                width: parent.width
-                color: "#2c2f34"
-            }
-            // Densité terrain & résolution heightmap
-            Column {
-                spacing: 4
-                Text { text: "Résolution terrain (densité): " + terrainManager.resolution; color: "white"; font.pixelSize: 14 }
-                Slider {
-                    from: 2; to: 1024; stepSize: 1
-                    value: terrainManager.resolution
-                    width: 260
-                    onValueChanged: terrainManager.resolution = Math.round(value);
-                    onPressedChanged: if (!pressed) terrainManager.generate()
-                }
-                Text { text: "Résolution heightmap: " + terrainManager.heightmapResolution; color: "white"; font.pixelSize: 14 }
-                ComboBox { model: [512,1024,2048,4096]; currentIndex: model.indexOf(terrainManager.heightmapResolution); onActivated: terrainManager.heightmapResolution = parseInt(currentText); width: 140 }
             }
 
-            Rectangle {
-                height: 2
-                width: parent.width
-                color: "#2c2f34"
-            }
+            ScrollBar.vertical: ScrollBar {
+                id: vScrollBar
+                parent: scrollView
+                anchors.right: scrollView.right
+                anchors.top: scrollView.top
+                anchors.bottom: scrollView.bottom
+                policy: ScrollBar.AsNeeded
+                hoverEnabled: true
 
-            // Paramètres de brush (MVP simple)
-            Column {
-                spacing: 4
-                Text { text: "Brush index: " + brushManager.brushIndex; color: "white"; font.pixelSize: 14 }
-                Slider {
-                    id: brushIndexSlider
-                    from: 0; to: 7; stepSize: 1
-                    value: brushManager.brushIndex
-                    width: 260
-                    onValueChanged: brushManager.brushIndex = Math.round(value)
+                width: 9
+                background: Rectangle {
+                    color: "transparent"
                 }
-                Text { text: "Brush size: " + brushManager.brushSize.toFixed(1); color: "white"; font.pixelSize: 14 }
-                Slider {
-                    id: brushSizeSlider
-                    from: 0.1; to: 10; stepSize: 0.1
-                    value: brushManager.brushSize
-                    width: 260
-                    onValueChanged: brushManager.brushSize = value
-                }
-                Text { text: "Brush strength: " + brushManager.brushStrength.toFixed(2); color: "white"; font.pixelSize: 14 }
-                Slider {
-                    id: brushStrengthSlider
-                    from: 0.0; to: 5.0; stepSize: 0.05
-                    value: brushManager.brushStrength
-                    width: 260
-                    onValueChanged: brushManager.brushStrength = value
+                contentItem: Rectangle {
+                    radius: 6
+                    color: vScrollBar.pressed ? "#3f4248" : vScrollBar.hovered ? "#37393e" : "#33353a"
                 }
             }
         }

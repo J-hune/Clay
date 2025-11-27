@@ -88,6 +88,7 @@ private:
 
     // Brushes
     BrushManager m_brushManager;
+    bool m_brushModelRefreshed = false;
 
     // Redraw management
     RedrawReason m_redrawReasons = RedrawReason::None;
