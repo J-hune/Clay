@@ -106,6 +106,12 @@ protected:
 
 private:
     friend class GLRenderer;
+    
+    // Helper methods
+    void computeMouseNDC(const QPointF &localPos);
+    void forwardMouseToCamera(QMouseEvent *event);
+    void forwardKeyboardToCamera(QKeyEvent *event, bool isPress);
+
     CameraController m_cameraController;
     Grid m_grid;
     float m_fps = 0.f;
