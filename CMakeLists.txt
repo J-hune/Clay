@@ -33,6 +33,10 @@ qt_add_resources(${CMAKE_PROJECT_NAME} "configuration"
     FILES
         qtquickcontrols2.conf)
 
+# Copier le dossier brushes dans le répertoire de build
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/brushes
+     DESTINATION ${CMAKE_BINARY_DIR})
+
 include(qds)
 
 if (BUILD_QDS_COMPONENTS)
