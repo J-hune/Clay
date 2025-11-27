@@ -27,13 +27,13 @@ QImage TerrainBuilder::loadHeightmapFromUrl(const QUrl &url) {
         LOG_WARN() << "URL de heightmap vide";
         return QImage();
     }
-    
+
     const QImage img = loadHeightImage(url);
     if (img.isNull()) {
         LOG_WARN() << "Impossible de charger la heightmap depuis: " << url.toString().toStdString();
     } else {
         LOG_INFO() << "Heightmap chargée avec succès: " << url.toString().toStdString();
     }
-    
+
     return img;
 }

@@ -1,111 +1,78 @@
 #ifndef CLAYAPP_GLVIEWPORT_H
 #define CLAYAPP_GLVIEWPORT_H
 
-#include "CameraController.h"
 #include "Grid.h"
-#include "TerrainMesh.h"
 #include <QQuickFramebufferObject>
-#include <QVector3D>
 
+// Forward declarations
+class CameraControllerQml;
+class BrushManagerQml;
+class RaycastControllerQml;
+class TerrainManagerQml;
+
+/**
+ * @brief GLViewport - Responsable uniquement du rendering OpenGL
+ * Les composants (Camera, Brush, Raycast, Terrain) sont gérés par des QObject séparés
+ */
 class GLViewport : public QQuickFramebufferObject {
     Q_OBJECT
+
+    Q_PROPERTY(int gridResolution READ gridResolution WRITE setGridResolution NOTIFY gridResolutionChanged)
+    Q_PROPERTY(bool drawGrid READ drawGrid WRITE setDrawGrid NOTIFY drawGridChanged)
+    Q_PROPERTY(bool drawAxes READ drawAxes WRITE setDrawAxes NOTIFY drawAxesChanged)
+    Q_PROPERTY(float fps READ fps NOTIFY fpsChanged)
+
+    // Références aux composants externes
+    Q_PROPERTY(QObject* cameraController READ cameraController WRITE setCameraController NOTIFY cameraControllerChanged)
+    Q_PROPERTY(QObject* brushManager READ brushManager WRITE setBrushManager NOTIFY brushManagerChanged)
+    Q_PROPERTY(QObject* raycastController READ raycastController WRITE setRaycastController NOTIFY raycastControllerChanged)
+    Q_PROPERTY(QObject* terrainManager READ terrainManager WRITE setTerrainManager NOTIFY terrainManagerChanged)
 
 public:
     explicit GLViewport(QQuickItem *parent = nullptr);
 
-    // Methodes de synchronisation avec le renderer
-    void setFpsFromRenderer(float fps);
-    bool userRequestedTerrain() const { return m_userRequestedTerrain; }
-    int terrainRevision() const { return m_terrainRevision; }
-
-    Q_PROPERTY(int gridResolution READ gridResolution WRITE setGridResolution NOTIFY gridResolutionChanged)
-    Q_PROPERTY(QVector3D cameraPosition READ cameraPosition NOTIFY cameraPositionChanged)
-    Q_PROPERTY(float yaw READ yaw NOTIFY yawChanged)
-    Q_PROPERTY(float pitch READ pitch NOTIFY pitchChanged)
-    Q_PROPERTY(float fps READ fps NOTIFY fpsChanged)
-    Q_PROPERTY(float mouseSensitivity READ mouseSensitivity WRITE setMouseSensitivity NOTIFY mouseSensitivityChanged)
-    Q_PROPERTY(bool drawGrid READ drawGrid WRITE setDrawGrid NOTIFY drawGridChanged)
-    Q_PROPERTY(bool drawAxes READ drawAxes WRITE setDrawAxes NOTIFY drawAxesChanged)
-    Q_PROPERTY(float cameraSpeed READ cameraSpeed WRITE setCameraSpeed NOTIFY cameraSpeedChanged)
-    Q_PROPERTY(float orbitDistance READ orbitDistance WRITE setOrbitDistance NOTIFY orbitDistanceChanged)
-    Q_PROPERTY(float cameraSpeedMin READ cameraSpeedMin CONSTANT)
-    Q_PROPERTY(float cameraSpeedMax READ cameraSpeedMax CONSTANT)
-    Q_PROPERTY(float orbitDistanceMin READ orbitDistanceMin CONSTANT)
-    Q_PROPERTY(float orbitDistanceMax READ orbitDistanceMax CONSTANT)
-    Q_PROPERTY(int terrainResolution READ terrainResolution WRITE setTerrainResolution NOTIFY terrainResolutionChanged)
-    Q_PROPERTY(int heightmapResolution READ heightmapResolution WRITE setHeightmapResolution NOTIFY heightmapResolutionChanged)
-    Q_PROPERTY(bool terrainReady READ terrainReady NOTIFY terrainReadyChanged)
-    Q_PROPERTY(QUrl heightmapSource READ heightmapSource WRITE setHeightmapSource NOTIFY heightmapSourceChanged)
-    Q_PROPERTY(float heightScale READ heightScale WRITE setHeightScale NOTIFY heightScaleChanged)
-    Q_PROPERTY(int terrainMode READ terrainMode WRITE setTerrainMode NOTIFY terrainModeChanged) // 0=Flat 1=Heightmap
-    Q_PROPERTY(int brushIndex READ brushIndex WRITE setBrushIndex NOTIFY brushIndexChanged)
-    Q_PROPERTY(float brushSize READ brushSize WRITE setBrushSize NOTIFY brushSizeChanged)
-    Q_PROPERTY(float brushStrength READ brushStrength WRITE setBrushStrength NOTIFY brushStrengthChanged)
-
     [[nodiscard]] Renderer *createRenderer() const override;
 
-    // Getters accessibles depuis QML
-    QVector3D cameraPosition() const { return m_cameraController.camera().position(); }
-    float yaw() const { return m_cameraController.camera().yaw(); }
-    float pitch() const { return m_cameraController.camera().pitch(); }
-    float fps() const { return m_fps; }
-    float cameraSpeed() const { return m_cameraController.speed(); }
-    float mouseSensitivity() const { return m_cameraController.mouseSensitivity(); }
-    int gridResolution() const { return m_grid.resolution(); }
-    bool drawGrid() const { return m_drawGrid; }
-    bool drawAxes() const { return m_drawAxes; }
-    float orbitDistance() const { return m_cameraController.orbitDistance(); }
-    float cameraSpeedMin() const { return m_cameraController.cameraSpeedMin(); }
-    float cameraSpeedMax() const { return m_cameraController.cameraSpeedMax(); }
-    float orbitDistanceMin() const { return m_cameraController.orbitDistanceMin(); }
-    float orbitDistanceMax() const { return m_cameraController.orbitDistanceMax(); }
-    int terrainResolution() const { return m_terrainResolution; }
-    int heightmapResolution() const { return m_heightmapResolution; }
-    bool terrainReady() const { return m_terrainReady; }
-    QUrl heightmapSource() const { return m_heightmapSource; }
-    float heightScale() const { return m_heightScale; }
-    int terrainMode() const { return m_terrainMode; }
-    int brushIndex() const { return m_brushIndex; }
-    float brushSize() const { return m_brushSize; }
-    float brushStrength() const { return m_brushStrength; }
+    // Synchronisation avec le renderer
+    void setFpsFromRenderer(float fps);
 
-    // Setters modifiables depuis QML
-    void setCameraSpeed(float s);
-    void setMouseSensitivity(float s);
+    // Grid properties
+    int gridResolution() const { return m_grid.resolution(); }
     void setGridResolution(int r);
+    bool drawGrid() const { return m_drawGrid; }
     void setDrawGrid(bool v);
+    bool drawAxes() const { return m_drawAxes; }
     void setDrawAxes(bool v);
-    void setOrbitDistance(float d);
-    void setTerrainResolution(int r);
-    void setHeightmapResolution(int r);
-    void setHeightmapSource(const QUrl &url);
-    void setHeightScale(float s);
-    void setTerrainMode(int m);
-    void setBrushIndex(int index);
-    void setBrushSize(float r);
-    void setBrushStrength(float s);
-    Q_INVOKABLE void generateTerrain();
+    float fps() const { return m_fps; }
+
+    // Accès aux composants
+    QObject* cameraController() const { return m_cameraController; }
+    void setCameraController(QObject* controller);
+    QObject* brushManager() const { return m_brushManager; }
+    void setBrushManager(QObject* manager);
+    QObject* raycastController() const { return m_raycastController; }
+    void setRaycastController(QObject* controller);
+    QObject* terrainManager() const { return m_terrainManager; }
+    void setTerrainManager(QObject* manager);
+
+    // Accès typé pour le renderer
+    CameraControllerQml* cameraControllerTyped() const;
+    BrushManagerQml* brushManagerTyped() const;
+    RaycastControllerQml* raycastControllerTyped() const;
+    TerrainManagerQml* terrainManagerTyped() const;
+
+    // Accès à la grille (pour le renderer)
+    const Grid& grid() const { return m_grid; }
 
 signals:
     void gridResolutionChanged();
-    void cameraPositionChanged();
-    void yawChanged();
-    void pitchChanged();
-    void fpsChanged();
-    void mouseSensitivityChanged();
     void drawGridChanged();
     void drawAxesChanged();
-    void cameraSpeedChanged();
-    void orbitDistanceChanged();
-    void terrainResolutionChanged();
-    void terrainReadyChanged();
-    void heightmapSourceChanged();
-    void heightScaleChanged();
-    void terrainModeChanged();
-    void heightmapResolutionChanged();
-    void brushIndexChanged();
-    void brushSizeChanged();
-    void brushStrengthChanged();
+    void fpsChanged();
+    void cameraControllerChanged();
+    void brushManagerChanged();
+    void raycastControllerChanged();
+    void terrainManagerChanged();
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -118,40 +85,18 @@ protected:
 
 private:
     friend class GLRenderer;
-    
-    // Helper methods
-    void computeMouseNDC(const QPointF &localPos);
-    void forwardMouseToCamera(QMouseEvent *event);
-    void forwardKeyboardToCamera(QKeyEvent *event, bool isPress);
 
-    CameraController m_cameraController;
     Grid m_grid;
     float m_fps = 0.f;
     bool m_drawGrid = true;
     bool m_drawAxes = true;
 
-    // Terrain
-    TerrainMesh m_terrainMesh; // maillage actuel
-    int m_terrainResolution = 256; // densité (X=Z)
-    bool m_terrainReady = false;
-    int m_terrainRevision = 0; // incrémenté à chaque génération pour forcer re-upload
-    QUrl m_heightmapSource; // source image
-    float m_heightScale = 50.f;
-    int m_terrainMode = 0; // 0 flat, 1 heightmap
-    bool m_userRequestedTerrain = false; // ajout: flag demande rebuild terrain
-    int m_heightmapResolution = 512; // ajout: résolution texture heightmap par défaut
-
-    // Raycast GPU
-    QVector2D m_mouseNDC{0.f, 0.f}; // Position souris en NDC
-    bool m_raycastRequested = false;
-
-    // Brush state
-    int m_brushIndex = 0;
-    float m_brushSize = 2.0f;
-    float m_brushStrength = 1.0f;
-
-    // Méthode pour réinitialiser le raycast
-    void invalidateRaycast() { m_raycastRequested = false; }
+    // Pointeurs vers les composants externes
+    QObject* m_cameraController = nullptr;
+    QObject* m_brushManager = nullptr;
+    QObject* m_raycastController = nullptr;
+    QObject* m_terrainManager = nullptr;
 };
 
 #endif // CLAYAPP_GLVIEWPORT_H
+

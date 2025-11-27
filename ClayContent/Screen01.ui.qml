@@ -27,6 +27,39 @@ Rectangle {
 
     color: Constants.backgroundColor
 
+    // ========================================
+    // Composants autonomes
+    // ========================================
+
+    CameraController {
+        id: cameraController
+        speed: 5.0
+        mouseSensitivity: 0.15
+        orbitDistance: 10.0
+
+        onSpeedChanged: speedBar.showTemp()
+        onOrbitDistanceChanged: distanceBar.showTemp()
+    }
+
+    BrushManager {
+        id: brushManager
+        brushIndex: 0
+        brushSize: 2.0
+        brushStrength: 1.0
+    }
+
+    RaycastController {
+        id: raycastController
+    }
+
+    TerrainManager {
+        id: terrainManager
+        resolution: 256
+        heightmapResolution: 512
+        heightScale: 50.0
+        mode: 0 // 0=Flat, 1=Heightmap
+    }
+
     Rectangle {
         id: topBar
         height: 60
@@ -74,8 +107,8 @@ Rectangle {
                     ComboBox {
                         id: modeCombo
                         model: ["Plat", "Heightmap"]
-                        currentIndex: glView.terrainMode
-                        onCurrentIndexChanged: glView.terrainMode = currentIndex
+                        currentIndex: terrainManager.mode
+                        onCurrentIndexChanged: terrainManager.mode = currentIndex
                         width: 120
                     }
                 }
@@ -85,30 +118,30 @@ Rectangle {
                     Slider {
                         id: heightScaleSlider
                         from: 0; to: 200; stepSize: 1
-                        value: glView.heightScale
-                        onValueChanged: glView.heightScale = value
+                        value: terrainManager.heightScale
+                        onValueChanged: terrainManager.heightScale = value
                         width: 120
                     }
-                    Text { text: Math.round(glView.heightScale); color: "#ccc" }
+                    Text { text: Math.round(terrainManager.heightScale); color: "#ccc" }
                 }
                 Row {
                     spacing: 6
-                    visible: glView.terrainMode === 1
+                    visible: terrainManager.mode === 1
                     Button { text: "Image..."; onClicked: fileDialog.open() }
-                    Text { text: glView.heightmapSource.toString().length > 0 ? glView.heightmapSource.toString().split('/').pop() : "(Aucune)"; color: "#ccc"; elide: Text.ElideRight; width: 110 }
+                    Text { text: terrainManager.heightmapSource.toString().length > 0 ? terrainManager.heightmapSource.toString().split('/').pop() : "(Aucune)"; color: "#ccc"; elide: Text.ElideRight; width: 110 }
                 }
                 FileDialog {
                     id: fileDialog
                     title: "Choisir une image heightmap"
                     onAccepted: {
-                        glView.heightmapSource = fileDialog.selectedFile
+                        terrainManager.heightmapSource = fileDialog.selectedFile
                     }
                 }
                 Button {
-                    text: glView.terrainReady ? "Régénérer" : "Générer"
-                    onClicked: glView.generateTerrain()
+                    text: terrainManager.ready ? "Régénérer" : "Générer"
+                    onClicked: terrainManager.generate()
                 }
-                Text { text: glView.terrainReady ? ("Triangles: " + ( (glView.terrainResolution-1)*(glView.terrainResolution-1)*2)) : "Terrain non prêt"; color: "#ccc"; font.pixelSize: 12 }
+                Text { text: terrainManager.ready ? ("Triangles: " + terrainManager.triangleCount) : "Terrain non prêt"; color: "#ccc"; font.pixelSize: 12 }
                 Button { text: "Fermer"; onClicked: terrainPopup.close() }
             }
             background: Rectangle { radius: 6; color: "#212429"; border.color: "#444"; border.width: 1 }
@@ -132,8 +165,12 @@ Rectangle {
             anchors.fill: parent
             focus: true
             activeFocusOnTab: true
-            onCameraSpeedChanged: {speedBar.showTemp()}
-            onOrbitDistanceChanged: {distanceBar.showTemp()}
+
+            // Liaison avec les composants
+            cameraController: cameraController
+            brushManager: brushManager
+            raycastController: raycastController
+            terrainManager: terrainManager
         }
 
         // Barre vitesse FPS (min=plein, max=vide)
@@ -151,9 +188,9 @@ Rectangle {
             color: "#222"
             border.width: 1
             border.color: "#444"
-            property real value: glView.cameraSpeed
-            property real minVal: glView.cameraSpeedMin
-            property real maxVal: glView.cameraSpeedMax
+            property real value: cameraController.speed
+            property real minVal: cameraController.speedMin
+            property real maxVal: cameraController.speedMax
             property int timeoutMs: 2000
             function ratio() {
                 // min -> 1, max -> 0
@@ -205,9 +242,9 @@ Rectangle {
             color: "#222"
             border.width: 1
             border.color: "#444"
-            property real value: glView.orbitDistance
-            property real minVal: glView.orbitDistanceMin
-            property real maxVal: glView.orbitDistanceMax
+            property real value: cameraController.orbitDistance
+            property real minVal: cameraController.orbitDistanceMin
+            property real maxVal: cameraController.orbitDistanceMax
             property int timeoutMs: 2000
             function ratio() {
                 var span = maxVal - minVal;
@@ -269,12 +306,12 @@ Rectangle {
                     font.pixelSize: 14
                 }
                 Text {
-                    text: "Pos: " + glView.cameraPosition.x.toFixed(1) + ", " + glView.cameraPosition.y.toFixed(1) + ", " + glView.cameraPosition.z.toFixed(1)
+                    text: "Pos: " + cameraController.position.x.toFixed(1) + ", " + cameraController.position.y.toFixed(1) + ", " + cameraController.position.z.toFixed(1)
                     color: "white"
                     font.pixelSize: 14
                 }
                 Text {
-                    text: "Yaw: " + glView.yaw.toFixed(1) + "  Pitch: " + glView.pitch.toFixed(1)
+                    text: "Yaw: " + cameraController.yaw.toFixed(1) + "  Pitch: " + cameraController.pitch.toFixed(1)
                     color: "white"
                     font.pixelSize: 14
                 }
@@ -299,6 +336,7 @@ Rectangle {
         property real initialPitch: 0
         property real initialMouseSensitivity: 0.15
         property int initialGridResolution: 50
+        property real initialCameraSpeed: 5.0
 
         // Handle gauche pour redimensionner la rightBar
         Rectangle {
@@ -363,7 +401,7 @@ Rectangle {
             Column {
                 spacing: 2
                 Text {
-                    text: "Sensibilité souris: " + glView.mouseSensitivity.toFixed(2)
+                    text: "Sensibilité souris: " + cameraController.mouseSensitivity.toFixed(2)
                     color: "white"
                     font.pixelSize: 14
                 }
@@ -372,14 +410,14 @@ Rectangle {
                     Slider {
                         id: sensSlider
                         from: 0; to: 1; stepSize: 0.01
-                        value: glView.mouseSensitivity
-                        onValueChanged: glView.mouseSensitivity = value
+                        value: cameraController.mouseSensitivity
+                        onValueChanged: cameraController.mouseSensitivity = value
                         width: 160
                     }
                     Button {
                         icon.height: 16; icon.width: 16
                         icon.source: "images/arrow-rotate-left.svg"
-                        onClicked: glView.mouseSensitivity = rightBar.initialMouseSensitivity
+                        onClicked: cameraController.mouseSensitivity = rightBar.initialMouseSensitivity
                     }
                 }
             }
@@ -433,16 +471,16 @@ Rectangle {
             // Densité terrain & résolution heightmap
             Column {
                 spacing: 4
-                Text { text: "Résolution terrain (densité): " + glView.terrainResolution; color: "white"; font.pixelSize: 14 }
+                Text { text: "Résolution terrain (densité): " + terrainManager.resolution; color: "white"; font.pixelSize: 14 }
                 Slider {
                     from: 2; to: 1024; stepSize: 1
-                    value: glView.terrainResolution
+                    value: terrainManager.resolution
                     width: 260
-                    onValueChanged: glView.terrainResolution = Math.round(value);
-                    onPressedChanged: if (!pressed) glView.generateTerrain()
+                    onValueChanged: terrainManager.resolution = Math.round(value);
+                    onPressedChanged: if (!pressed) terrainManager.generate()
                 }
-                Text { text: "Résolution heightmap: " + glView.heightmapResolution; color: "white"; font.pixelSize: 14 }
-                ComboBox { model: [512,1024,2048,4096]; currentIndex: model.indexOf(glView.heightmapResolution); onActivated: glView.heightmapResolution = parseInt(currentText); width: 140 }
+                Text { text: "Résolution heightmap: " + terrainManager.heightmapResolution; color: "white"; font.pixelSize: 14 }
+                ComboBox { model: [512,1024,2048,4096]; currentIndex: model.indexOf(terrainManager.heightmapResolution); onActivated: terrainManager.heightmapResolution = parseInt(currentText); width: 140 }
             }
 
             Rectangle {
@@ -454,29 +492,29 @@ Rectangle {
             // Paramètres de brush (MVP simple)
             Column {
                 spacing: 4
-                Text { text: "Brush index: " + glView.brushIndex; color: "white"; font.pixelSize: 14 }
+                Text { text: "Brush index: " + brushManager.brushIndex; color: "white"; font.pixelSize: 14 }
                 Slider {
                     id: brushIndexSlider
                     from: 0; to: 7; stepSize: 1
-                    value: glView.brushIndex
+                    value: brushManager.brushIndex
                     width: 260
-                    onValueChanged: glView.brushIndex = Math.round(value)
+                    onValueChanged: brushManager.brushIndex = Math.round(value)
                 }
-                Text { text: "Brush size: " + glView.brushSize.toFixed(1); color: "white"; font.pixelSize: 14 }
+                Text { text: "Brush size: " + brushManager.brushSize.toFixed(1); color: "white"; font.pixelSize: 14 }
                 Slider {
                     id: brushSizeSlider
                     from: 0.1; to: 10; stepSize: 0.1
-                    value: glView.brushSize
+                    value: brushManager.brushSize
                     width: 260
-                    onValueChanged: glView.brushSize = value
+                    onValueChanged: brushManager.brushSize = value
                 }
-                Text { text: "Brush strength: " + glView.brushStrength.toFixed(2); color: "white"; font.pixelSize: 14 }
+                Text { text: "Brush strength: " + brushManager.brushStrength.toFixed(2); color: "white"; font.pixelSize: 14 }
                 Slider {
                     id: brushStrengthSlider
                     from: 0.0; to: 5.0; stepSize: 0.05
-                    value: glView.brushStrength
+                    value: brushManager.brushStrength
                     width: 260
-                    onValueChanged: glView.brushStrength = value
+                    onValueChanged: brushManager.brushStrength = value
                 }
             }
         }
