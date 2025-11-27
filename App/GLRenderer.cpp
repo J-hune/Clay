@@ -123,8 +123,10 @@ void GLRenderer::render() {
     if (m_terrainReady) {
         m_terrainGpu.draw(this, proj, view);
 
-        // Lancer le raycast si demandé (par move) ou si on force sur mouseMoved
-        if (m_mouseMoved) {
+        if (m_viewport && m_viewport->m_cameraController.isMovingCamera()) {
+            m_terrainGpu.clearRaycastHit();
+            m_viewport->invalidateRaycast();
+        } else if (m_mouseMoved) {
             // On configure les bounds du terrain
             m_terrainRaycast.setTerrainBounds(-50.0f, 50.0f, -50.0f, 50.0f);
             m_terrainRaycast.performRaycast(

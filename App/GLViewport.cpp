@@ -176,6 +176,10 @@ void GLViewport::wheelEvent(QWheelEvent *event) {
 
 // Event de déplacement de la souris (sans bouton appuyé)
 void GLViewport::hoverMoveEvent(QHoverEvent *event) {
+    if (m_cameraController.isMovingCamera()) {
+        return; // Pas de raycast pendant le déplacement de la caméra
+    }
+
     const float w_width = static_cast<float>(width());
     const float w_height = static_cast<float>(height());
 

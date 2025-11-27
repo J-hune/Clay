@@ -31,6 +31,7 @@ public:
     float cameraSpeedMax() const { return m_cameraSpeedMax; }
 
     Mode mode() const { return m_mode; }
+    bool isMovingCamera() const { return m_rightButtonDown || m_middleButtonDown; }
 
     // Entrées clavier
     void handleKeyPress(const QKeyEvent *e) {
@@ -71,6 +72,8 @@ public:
             m_middleButtonDown = true;
             m_mode = Mode::Orbit;
             m_lastMousePos = e->position().toPoint();
+
+            window->setCursor(QCursor(Qt::ClosedHandCursor));
         }
     }
 
@@ -110,6 +113,8 @@ public:
         } else if (e->button() == Qt::MiddleButton) {
             m_middleButtonDown = false;
             m_mode = Mode::Orbit;
+
+            window->setCursor(QCursor(Qt::ArrowCursor));
         }
     }
 

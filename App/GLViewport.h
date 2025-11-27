@@ -126,6 +126,9 @@ private:
     // Raycast GPU
     QVector2D m_mouseNDC{0.f, 0.f}; // Position souris en NDC
     bool m_raycastRequested = false;
+
+    // Méthode pour réinitialiser le raycast
+    void invalidateRaycast() { m_raycastRequested = false; }
 };
 
 #endif // CLAYAPP_GLVIEWPORT_H
