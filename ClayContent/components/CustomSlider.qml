@@ -10,7 +10,7 @@ FocusScope {
     property real stepSize: 1
     property string label: ""
     property int decimals: 1
-    property color backgroundColor: "#23262b"
+    property color backgroundColor: "#212429"
     property color primaryColor: "#bf5934"
     property color textColor: "white"
 

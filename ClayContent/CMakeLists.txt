@@ -11,7 +11,6 @@ qt6_add_qml_module(ClayContent
         "components/DistanceBar.qml"
         "components/DebugOverlay.qml"
         "components/GridControl.qml"
-        "components/TerrainSection.qml"
         "components/BrushSection.qml"
         "components/RightBar.qml"
         "components/CustomSlider.qml"
