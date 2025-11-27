@@ -14,6 +14,7 @@ qt6_add_qml_module(ClayContent
         "components/TerrainSection.qml"
         "components/BrushSection.qml"
         "components/RightBar.qml"
+        "components/CustomSlider.qml"
     RESOURCES
         "images/arrow-rotate-left.svg"
         "images/magnifying-glass-plus.svg"

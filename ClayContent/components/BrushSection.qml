@@ -39,11 +39,12 @@ Rectangle {
         Row {
             width: parent.width
             spacing: 12
+            bottomPadding: 4
 
             // Prévisualisation 128px
             Rectangle {
-                width: 128
-                height: 128
+                width: 120
+                height: 120
                 color: "#2e3136"
                 radius: 8
                 border.color: "#52555b"
@@ -92,43 +93,29 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
 
                 // Brush size
-                Column {
+                CustomSlider {
+                    id: brushSizeSlider
                     width: parent.width
-                    spacing: 4
-                    Text {
-                        text: "Taille: " + brushManager.brushSize.toFixed(1)
-                        color: "white"
-                        font.pixelSize: 13
-                    }
-                    Slider {
-                        id: brushSizeSlider
-                        width: parent.width
-                        from: 0.1
-                        to: 10
-                        stepSize: 0.1
-                        value: brushManager.brushSize
-                        onValueChanged: brushManager.brushSize = value
-                    }
+                    from: 0.1
+                    to: 10
+                    stepSize: 0.1
+                    value: brushManager.brushSize
+                    label: "Taille"
+                    decimals: 1
+                    onValueChanged: brushManager.brushSize = value
                 }
 
                 // Brush strength
-                Column {
+                CustomSlider {
+                    id: brushStrengthSlider
                     width: parent.width
-                    spacing: 4
-                    Text {
-                        text: "Intensité: " + brushManager.brushStrength.toFixed(2)
-                        color: "white"
-                        font.pixelSize: 13
-                    }
-                    Slider {
-                        id: brushStrengthSlider
-                        width: parent.width
-                        from: 0.0
-                        to: 5.0
-                        stepSize: 0.05
-                        value: brushManager.brushStrength
-                        onValueChanged: brushManager.brushStrength = value
-                    }
+                    from: 0.0
+                    to: 5.0
+                    stepSize: 0.05
+                    value: brushManager.brushStrength
+                    label: "Intensité"
+                    decimals: 2
+                    onValueChanged: brushManager.brushStrength = value
                 }
             }
         }
