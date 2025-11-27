@@ -28,135 +28,11 @@ Rectangle {
     color: Constants.backgroundColor
 
     Rectangle {
-        id: leftBar
-        width: 420
-        color: "#272a2f"
+        id: topBar
+        height: 60
+        color: "#2e3136"
         border.width: 0
         anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.leftMargin: 0
-        anchors.topMargin: 0
-        anchors.bottomMargin: 0
-
-        // Valeurs initiales pour les resets
-        property real initialYaw: -90
-        property real initialPitch: 0
-        property real initialMouseSensitivity: 0.15
-        property int initialGridResolution: 50
-
-        Column {
-            id: controlColumn
-            anchors.fill: parent
-            anchors.margins: 12
-            spacing: 10
-
-            Text {
-                text: "Statut Rendu"
-                font.pixelSize: 18
-                color: "white"
-            }
-            Rectangle {
-                height: 2
-                width: parent.width
-                color: "#2c2f34"
-            }
-
-            // Contrôle sensibilité souris
-            Column {
-                spacing: 2
-                Text {
-                    text: "Sensibilité souris: " + glView.mouseSensitivity.toFixed(2)
-                    color: "white"
-                    font.pixelSize: 14
-                }
-                Row {
-                    spacing: 6
-                    Slider {
-                        id: sensSlider
-                        from: 0; to: 1; stepSize: 0.01
-                        value: glView.mouseSensitivity
-                        onValueChanged: glView.mouseSensitivity = value
-                        width: 160
-                    }
-                    Button {
-                        icon.height: 16; icon.width: 16
-                        icon.source: "images/arrow-rotate-left.svg"
-                        onClicked: glView.mouseSensitivity = leftBar.initialMouseSensitivity
-                    }
-                }
-            }
-            // Contrôle résolution grille
-            Column {
-                spacing: 2
-                Text {
-                    text: "Résolution grille: " + glView.gridResolution
-                    color: "white"
-                    font.pixelSize: 14
-                }
-                Row {
-                    spacing: 8
-                    Slider {
-                        id: gridSlider
-                        from: 1; to: 500; stepSize: 1
-                        value: glView.gridResolution
-                        onValueChanged: glView.gridResolution = Math.round(value)
-                        width: 140
-                    }
-                    Button {
-                        icon.source: "images/arrow-rotate-left.svg"
-                        icon.height: 16; icon.width: 16
-                        onClicked: glView.gridResolution = leftBar.initialGridResolution
-                    }
-                }
-            }
-            Row {
-                // Switch grille / axes
-                spacing: 24
-                Switch {
-                    id: gridSwitch
-                    text: "Grille"
-                    checked: glView.drawGrid
-                    Material.accent: "#bf5934"
-                    onToggled: { glView.drawGrid = checked; glView.update(); }
-                }
-                Switch {
-                    id: axesSwitch
-                    text: "Axes"
-                    checked: glView.drawAxes
-                    Material.accent: "#bf5934"
-                    onToggled: { glView.drawAxes = checked; glView.update(); }
-                }
-            }
-            Rectangle {
-                height: 1
-                width: parent.width
-                color: "#444"
-            }
-
-            // Densité terrain & résolution heightmap
-            Column {
-                spacing: 4
-                Text { text: "Résolution terrain (densité): " + glView.terrainResolution; color: "white"; font.pixelSize: 14 }
-                Slider {
-                    from: 2; to: 1024; stepSize: 1
-                    value: glView.terrainResolution
-                    width: 260
-                    onValueChanged: glView.terrainResolution = Math.round(value);
-                    onPressedChanged: if (!pressed) glView.generateTerrain()
-                }
-                Text { text: "Résolution heightmap: " + glView.heightmapResolution; color: "white"; font.pixelSize: 14 }
-                ComboBox { model: [512,1024,2048,4096]; currentIndex: model.indexOf(glView.heightmapResolution); onActivated: glView.heightmapResolution = parseInt(currentText); width: 140 }
-            }
-        }
-    }
-
-    Rectangle {
-        id: topBar
-        height: 54
-        color: "#212429"
-        border.width: 0
-        anchors.left: leftBar.right
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.leftMargin: 0
@@ -171,6 +47,7 @@ Rectangle {
 
             Button {
                 id: terrainButton
+                anchors.verticalCenter: parent.verticalCenter
                 text: "Terrain"
                 icon.source: "images/layer-plus.svg"
                 icon.width: 16; icon.height: 16
@@ -239,10 +116,10 @@ Rectangle {
     }
 
     Rectangle {
-        id: rightBar
+        id: openGLArea
         border.width: 0
-        anchors.left: leftBar.right
-        anchors.right: parent.right
+        anchors.left: parent.left
+        anchors.right: rightBar.left
         anchors.top: topBar.bottom
         anchors.bottom: parent.bottom
         anchors.leftMargin: 0
@@ -400,6 +277,206 @@ Rectangle {
                     text: "Yaw: " + glView.yaw.toFixed(1) + "  Pitch: " + glView.pitch.toFixed(1)
                     color: "white"
                     font.pixelSize: 14
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        id: rightBar
+        width: 400
+        color: "#272a2f"
+        border.width: 0
+        anchors.right: parent.right
+        anchors.top: topBar.bottom
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: 0
+        anchors.topMargin: 0
+        anchors.bottomMargin: 0
+
+        // Valeurs initiales pour les resets
+        property real initialYaw: -90
+        property real initialPitch: 0
+        property real initialMouseSensitivity: 0.15
+        property int initialGridResolution: 50
+
+        // Handle gauche pour redimensionner la rightBar
+        Rectangle {
+            id: rightHandle
+            width: 5
+            height: parent.height
+            anchors.left: parent.left
+            anchors.bottom: parent.bottom
+            color: "#272a2f"
+            Behavior on color { ColorAnimation { duration: 100 } }
+
+            MouseArea {
+                id: rightDragArea
+                anchors.fill: parent
+                cursorShape: Qt.SizeHorCursor
+                hoverEnabled: true
+
+                property bool dragging: false
+                property real startW
+                property real startX
+
+                onEntered: rightHandle.color = "#2e3136"
+                onExited: {
+                    if (!dragging) {
+                        rightHandle.color = "#272a2f"
+                    }
+                }
+
+                onPressed: (m) => {
+                    dragging = true
+                    startW = rightBar.width
+                    startX = mapToGlobal(Qt.point(m.x, m.y)).x
+                }
+
+                onPositionChanged: (m) => {
+                    if (dragging) {
+                        const globalX = mapToGlobal(Qt.point(m.x, m.y)).x;
+                        // Tirer vers la gauche => augmente la largeur, vers la droite => la réduit
+                        const delta = globalX - startX;
+                        const minW = 200;
+                        const maxW = 600;
+                        rightBar.width = Math.max(minW, Math.min(maxW, startW - delta));
+                    }
+                }
+
+                onReleased: {
+                    dragging = false
+                    if (!containsMouse) {
+                        rightHandle.color = "#272a2f"
+                    }
+                }
+            }
+        }
+
+        Column {
+            id: controlColumn
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 10
+
+            // Contrôle sensibilité souris
+            Column {
+                spacing: 2
+                Text {
+                    text: "Sensibilité souris: " + glView.mouseSensitivity.toFixed(2)
+                    color: "white"
+                    font.pixelSize: 14
+                }
+                Row {
+                    spacing: 6
+                    Slider {
+                        id: sensSlider
+                        from: 0; to: 1; stepSize: 0.01
+                        value: glView.mouseSensitivity
+                        onValueChanged: glView.mouseSensitivity = value
+                        width: 160
+                    }
+                    Button {
+                        icon.height: 16; icon.width: 16
+                        icon.source: "images/arrow-rotate-left.svg"
+                        onClicked: glView.mouseSensitivity = rightBar.initialMouseSensitivity
+                    }
+                }
+            }
+            // Contrôle résolution grille
+            Column {
+                spacing: 2
+                Text {
+                    text: "Résolution grille: " + glView.gridResolution
+                    color: "white"
+                    font.pixelSize: 14
+                }
+                Row {
+                    spacing: 8
+                    Slider {
+                        id: gridSlider
+                        from: 1; to: 500; stepSize: 1
+                        value: glView.gridResolution
+                        onValueChanged: glView.gridResolution = Math.round(value)
+                        width: 140
+                    }
+                    Button {
+                        icon.source: "images/arrow-rotate-left.svg"
+                        icon.height: 16; icon.width: 16
+                        onClicked: glView.gridResolution = rightBar.initialGridResolution
+                    }
+                }
+            }
+            Row {
+                // Switch grille / axes
+                spacing: 24
+                Switch {
+                    id: gridSwitch
+                    text: "Grille"
+                    checked: glView.drawGrid
+                    Material.accent: "#bf5934"
+                    onToggled: { glView.drawGrid = checked; glView.update(); }
+                }
+                Switch {
+                    id: axesSwitch
+                    text: "Axes"
+                    checked: glView.drawAxes
+                    Material.accent: "#bf5934"
+                    onToggled: { glView.drawAxes = checked; glView.update(); }
+                }
+            }
+            Rectangle {
+                height: 2
+                width: parent.width
+                color: "#2c2f34"
+            }
+            // Densité terrain & résolution heightmap
+            Column {
+                spacing: 4
+                Text { text: "Résolution terrain (densité): " + glView.terrainResolution; color: "white"; font.pixelSize: 14 }
+                Slider {
+                    from: 2; to: 1024; stepSize: 1
+                    value: glView.terrainResolution
+                    width: 260
+                    onValueChanged: glView.terrainResolution = Math.round(value);
+                    onPressedChanged: if (!pressed) glView.generateTerrain()
+                }
+                Text { text: "Résolution heightmap: " + glView.heightmapResolution; color: "white"; font.pixelSize: 14 }
+                ComboBox { model: [512,1024,2048,4096]; currentIndex: model.indexOf(glView.heightmapResolution); onActivated: glView.heightmapResolution = parseInt(currentText); width: 140 }
+            }
+
+            Rectangle {
+                height: 2
+                width: parent.width
+                color: "#2c2f34"
+            }
+
+            // Paramètres de brush (MVP simple)
+            Column {
+                spacing: 4
+                Text { text: "Brush index: " + glView.brushIndex; color: "white"; font.pixelSize: 14 }
+                Slider {
+                    id: brushIndexSlider
+                    from: 0; to: 7; stepSize: 1
+                    value: glView.brushIndex
+                    width: 260
+                    onValueChanged: glView.brushIndex = Math.round(value)
+                }
+                Text { text: "Brush size: " + glView.brushSize.toFixed(1); color: "white"; font.pixelSize: 14 }
+                Slider {
+                    id: brushSizeSlider
+                    from: 0.1; to: 10; stepSize: 0.1
+                    value: glView.brushSize
+                    width: 260
+                    onValueChanged: glView.brushSize = value
+                }
+                Text { text: "Brush strength: " + glView.brushStrength.toFixed(2); color: "white"; font.pixelSize: 14 }
+                Slider {
+                    id: brushStrengthSlider
+                    from: 0.0; to: 5.0; stepSize: 0.05
+                    value: glView.brushStrength
+                    width: 260
+                    onValueChanged: glView.brushStrength = value
                 }
             }
         }

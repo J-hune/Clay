@@ -8,6 +8,7 @@
 #include "Grid.h"
 #include "TerrainGpu.h"
 #include "RaycastController.h"
+#include "BrushManager.h"
 
 class GLViewport; // forward
 
@@ -42,6 +43,7 @@ private:
     void syncViewportState();
     void syncTerrain();
     void syncInteractionState();
+    void syncBrushState();
 
     // Render helpers
     float computeDeltaTime();
@@ -53,6 +55,9 @@ private:
     void drawScene(const QMatrix4x4 &proj, const QMatrix4x4 &view);
     void processRaycast(const QMatrix4x4 &proj, const QMatrix4x4 &view);
     void finalizeFrame();
+
+    // Brush application
+    void applyPendingStrokes();
 
     // Redraw policy
     void requestRedraw(RedrawReason reason);
@@ -80,6 +85,9 @@ private:
     // Raycast
     RaycastController m_raycastController;
     bool m_mouseMoved = false;
+
+    // Brushes
+    BrushManager m_brushManager;
 
     // Redraw management
     RedrawReason m_redrawReasons = RedrawReason::None;

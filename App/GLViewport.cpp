@@ -18,6 +18,11 @@ GLViewport::GLViewport(QQuickItem *parent) : QQuickFramebufferObject(parent) {
     setFlag(ItemIsFocusScope, true);
     setFlag(ItemAcceptsInputMethod, true);
     setFocus(true);
+
+    // Valeurs par défaut pour les brushes
+    m_brushIndex = 0;
+    m_brushSize = 2.0f;
+    m_brushStrength = 1.0f;
 }
 
 void GLViewport::setFpsFromRenderer(float fps) {
@@ -114,6 +119,29 @@ void GLViewport::setTerrainMode(int m) {
     if (m < 0 || m > 1) return;
     m_terrainMode = m;
     emit terrainModeChanged();
+}
+
+void GLViewport::setBrushIndex(int index) {
+    if (index == m_brushIndex) return;
+    m_brushIndex = index;
+    emit brushIndexChanged();
+    update();
+}
+
+void GLViewport::setBrushSize(float r) {
+    if (r < 0.f) r = 0.f;
+    if (qFuzzyCompare(r, m_brushSize)) return;
+    m_brushSize = r;
+    emit brushSizeChanged();
+    update();
+}
+
+void GLViewport::setBrushStrength(float s) {
+    if (s < 0.f) s = 0.f;
+    if (qFuzzyCompare(s, m_brushStrength)) return;
+    m_brushStrength = s;
+    emit brushStrengthChanged();
+    update();
 }
 
 void GLViewport::generateTerrain() {

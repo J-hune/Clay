@@ -38,6 +38,9 @@ public:
     Q_PROPERTY(QUrl heightmapSource READ heightmapSource WRITE setHeightmapSource NOTIFY heightmapSourceChanged)
     Q_PROPERTY(float heightScale READ heightScale WRITE setHeightScale NOTIFY heightScaleChanged)
     Q_PROPERTY(int terrainMode READ terrainMode WRITE setTerrainMode NOTIFY terrainModeChanged) // 0=Flat 1=Heightmap
+    Q_PROPERTY(int brushIndex READ brushIndex WRITE setBrushIndex NOTIFY brushIndexChanged)
+    Q_PROPERTY(float brushSize READ brushSize WRITE setBrushSize NOTIFY brushSizeChanged)
+    Q_PROPERTY(float brushStrength READ brushStrength WRITE setBrushStrength NOTIFY brushStrengthChanged)
 
     [[nodiscard]] Renderer *createRenderer() const override;
 
@@ -62,6 +65,9 @@ public:
     QUrl heightmapSource() const { return m_heightmapSource; }
     float heightScale() const { return m_heightScale; }
     int terrainMode() const { return m_terrainMode; }
+    int brushIndex() const { return m_brushIndex; }
+    float brushSize() const { return m_brushSize; }
+    float brushStrength() const { return m_brushStrength; }
 
     // Setters modifiables depuis QML
     void setCameraSpeed(float s);
@@ -75,6 +81,9 @@ public:
     void setHeightmapSource(const QUrl &url);
     void setHeightScale(float s);
     void setTerrainMode(int m);
+    void setBrushIndex(int index);
+    void setBrushSize(float r);
+    void setBrushStrength(float s);
     Q_INVOKABLE void generateTerrain();
 
 signals:
@@ -94,6 +103,9 @@ signals:
     void heightScaleChanged();
     void terrainModeChanged();
     void heightmapResolutionChanged();
+    void brushIndexChanged();
+    void brushSizeChanged();
+    void brushStrengthChanged();
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -132,6 +144,11 @@ private:
     // Raycast GPU
     QVector2D m_mouseNDC{0.f, 0.f}; // Position souris en NDC
     bool m_raycastRequested = false;
+
+    // Brush state
+    int m_brushIndex = 0;
+    float m_brushSize = 2.0f;
+    float m_brushStrength = 1.0f;
 
     // Méthode pour réinitialiser le raycast
     void invalidateRaycast() { m_raycastRequested = false; }

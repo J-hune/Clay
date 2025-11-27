@@ -22,6 +22,14 @@ public:
     void setRaycastHit(const QVector3D &pos) { m_hitPos = pos; m_hitValid = true; }
     void clearRaycastHit() { m_hitValid = false; }
 
+    // Paramètres de brush pour le rendu
+    void setBrushPreview(int brushIndex, float radius, float strength) {
+        m_brushIndex = brushIndex;
+        m_brushSize = radius;
+        m_brushStrength = strength;
+    }
+    void setBrushTextureArray(GLuint texArray) { m_brushArray = texArray; }
+
 private:
     void ensureMesh(QOpenGLFunctions *gl);
     void ensureProgram(const QOpenGLFunctions *gl);
@@ -49,6 +57,12 @@ private:
     // Raycast hit visualization
     QVector3D m_hitPos{0.0f, 0.0f, 0.0f};
     bool m_hitValid = false;
+
+    // Brush preview params (utilisés dans le fragment shader)
+    int m_brushIndex = 0;
+    float m_brushSize = 2.0f;
+    float m_brushStrength = 1.0f;
+    GLuint m_brushArray = 0; // texture array contenant les brushes
 };
 
 #endif // CLAYAPP_TERRAINGPU_H
