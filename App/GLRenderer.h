@@ -7,9 +7,28 @@
 #include "CameraController.h"
 #include "Grid.h"
 #include "TerrainGpu.h"
-#include "TerrainRaycast.h"
+#include "RaycastController.h"
 
 class GLViewport; // forward
+
+enum class RedrawReason {
+    None            = 0,
+    TerrainChanged  = 1 << 0,
+    GridChanged     = 1 << 1,
+    CameraMoved     = 1 << 2,
+    RaycastChanged  = 1 << 3
+};
+
+inline RedrawReason operator|(RedrawReason a, RedrawReason b) {
+    return static_cast<RedrawReason>(static_cast<int>(a) | static_cast<int>(b));
+}
+inline RedrawReason& operator|=(RedrawReason &a, RedrawReason b) {
+    a = a | b;
+    return a;
+}
+inline bool operator&(RedrawReason a, RedrawReason b) {
+    return (static_cast<int>(a) & static_cast<int>(b)) != 0;
+}
 
 class GLRenderer : public QQuickFramebufferObject::Renderer, protected QOpenGLExtraFunctions {
 public:
@@ -17,6 +36,30 @@ public:
     void synchronize(QQuickFramebufferObject *item) override;
     void render() override;
     QOpenGLFramebufferObject *createFramebufferObject(const QSize &size) override;
+
+private:
+    // Synchronize helpers
+    void syncViewportState();
+    void syncTerrain();
+    void syncInteractionState();
+
+    // Render helpers
+    float computeDeltaTime();
+    void updateFPS(float dt);
+    void updateCamera(float dt, bool &cameraDirty);
+    bool shouldRenderFrame(bool cameraDirty) const;
+    void prepareGLState();
+    void computeMatrices(QMatrix4x4 &proj, QMatrix4x4 &view);
+    void drawScene(const QMatrix4x4 &proj, const QMatrix4x4 &view);
+    void processRaycast(const QMatrix4x4 &proj, const QMatrix4x4 &view);
+    void finalizeFrame();
+
+    // Redraw policy
+    void requestRedraw(RedrawReason reason);
+
+    // Matrix helpers
+    void updateProjectionMatrix(int width, int height, QMatrix4x4 &proj);
+    void updateViewMatrix(const Camera &camera, QMatrix4x4 &view);
 
 private:
     QElapsedTimer m_timer;
@@ -28,16 +71,18 @@ private:
     TerrainGpu m_terrainGpu;
     bool m_terrainReady = false;
     int m_lastTerrainRevision = -1;
-    bool m_needRedraw = false; // demande ponctuelle (terrain rebuild / changement grille / axes)
 
     // Etats précédents pour détecter un changement côté QML
     int m_prevGridResolution = -1;
     bool m_prevDrawGrid = true;
     bool m_prevDrawAxes = true;
 
-    // Raycast GPU
-    TerrainRaycast m_terrainRaycast;
+    // Raycast
+    RaycastController m_raycastController;
     bool m_mouseMoved = false;
+
+    // Redraw management
+    RedrawReason m_redrawReasons = RedrawReason::None;
 };
 
 #endif // CLAYAPP_GLRENDERER_H
