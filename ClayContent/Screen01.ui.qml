@@ -131,6 +131,17 @@ Rectangle {
             glView: glView
             cameraController: cameraController
         }
+
+        // Contrôles de grille en haut à droite
+        GridControl {
+            id: gridControl
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.rightMargin: 8
+            anchors.topMargin: 8
+            glView: glView
+            cameraController: cameraController
+        }
     }
 
     RightBar {

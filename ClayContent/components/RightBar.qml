@@ -77,38 +77,22 @@ Rectangle {
         }
     }
 
-    ScrollView {
+    Flickable {
         id: scrollView
         anchors.fill: parent
         anchors.leftMargin: 12
+        contentHeight: controlColumn.height
+        boundsBehavior: Flickable.StopAtBounds
         clip: true
-
-        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
         Column {
             id: controlColumn
-            width: scrollView.width - scrollView.effectiveScrollBarWidth - 4
+            anchors.left: parent.left
+            anchors.right: parent.right
             topPadding: 10
             bottomPadding: 10
+            anchors.rightMargin: vScrollBar.width + 4
             spacing: 10
-
-            // ═══════════════════════════════════════════
-            // SECTION: CAMÉRA & AFFICHAGE
-            // ═══════════════════════════════════════════
-            CameraSection {
-                width: parent.width
-                cameraController: rightBar.cameraController
-                glView: rightBar.glView
-                initialMouseSensitivity: rightBar.initialMouseSensitivity
-                initialGridResolution: rightBar.initialGridResolution
-            }
-
-            // Séparateur
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: "#3a3d42"
-            }
 
             // ═══════════════════════════════════════════
             // SECTION: TERRAIN
