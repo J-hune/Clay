@@ -91,7 +91,7 @@ Rectangle {
             anchors.right: parent.right
             topPadding: 10
             bottomPadding: 10
-            anchors.rightMargin: vScrollBar.width + 4
+            anchors.rightMargin: vScrollBar.width + 6
             spacing: 10
 
 

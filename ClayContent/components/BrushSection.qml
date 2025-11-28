@@ -12,42 +12,38 @@ Rectangle {
     Column {
         id: brushSection
         width: parent.width
-        spacing: 8
+        spacing: 16
 
         // Header section
-        Row {
+        Column {
             width: parent.width
-            spacing: 8
+            spacing: 6
+
             Text {
-                text: "Brush"
-                color: "#bf5934"
-                font.pixelSize: 16
+                text: "Pinceaux"
+                color: "#e5e9f0"
+                font.pixelSize: 15
                 font.weight: Font.DemiBold
             }
-            Text {
-                anchors.bottom: parent.bottom
-                text: brushManager.brushCount > 0 ?
-                    brushManager.brushModel.data(brushManager.brushModel.index(brushManager.brushIndex, 0), 258) :
-                    "None"
-                color: "#aaa"
-                font.pixelSize: 12
-                font.italic: true
+
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: "#3a3d42"
             }
         }
 
-        // Prévisualisation du brush actuel avec contrôles
         Row {
             width: parent.width
-            spacing: 12
-            bottomPadding: 4
+            spacing: 20
 
-            // Prévisualisation 128px
+            // Grande prévisualisation
             Rectangle {
-                width: 120
-                height: 120
-                color: "#2e3136"
-                radius: 8
-                border.color: "#52555b"
+                width: 108
+                height: 108
+                color: "#1e2024"
+                radius: 12
+                border.color: "transparent"
                 border.width: 2
 
                 property string currentBrushPath: brushManager.brushCount > 0 ?
@@ -56,7 +52,7 @@ Rectangle {
                 Image {
                     id: currentBrushImage
                     anchors.fill: parent
-                    anchors.margins: 8
+                    anchors.margins: 2
                     source: parent.currentBrushPath ? "file://" + parent.currentBrushPath : ""
                     fillMode: Image.PreserveAspectFit
                     smooth: true
@@ -80,19 +76,24 @@ Rectangle {
                     Rectangle {
                         width: currentBrushImage.width
                         height: currentBrushImage.height
-                        radius: 8
+                        radius: 12
                         color: "black"
                     }
                 }
             }
 
-            // Contrôles (sliders)
+            // Contrôles
             Column {
-                width: parent.width - 140
-                spacing: 12
-                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width - 160
+                spacing: 10
 
-                // Brush size
+                Text {
+                    text: "Paramètres"
+                    color: "#d8dee9"
+                    font.pixelSize: 13
+                    font.weight: Font.Medium
+                }
+
                 CustomSlider {
                     id: brushSizeSlider
                     width: parent.width
@@ -102,10 +103,11 @@ Rectangle {
                     value: brushManager.brushSize
                     label: "Taille"
                     decimals: 1
+                    primaryColor: "#5e81ac"
+                    textColor: "#d8dee9"
                     onValueChanged: brushManager.brushSize = value
                 }
 
-                // Brush strength
                 CustomSlider {
                     id: brushStrengthSlider
                     width: parent.width
@@ -115,70 +117,98 @@ Rectangle {
                     value: brushManager.brushStrength
                     label: "Intensité"
                     decimals: 2
+                    primaryColor: "#5e81ac"
+                    textColor: "#d8dee9"
                     onValueChanged: brushManager.brushStrength = value
                 }
             }
         }
 
-        // Grille de brushes responsive
-        Flow {
-            id: brushFlow
+        // Séparateur
+        Rectangle {
             width: parent.width
-            spacing: 6
+            height: 1
+            color: "#3a3d42"
+        }
 
-            Repeater {
-                id: brushRepeater
-                model: brushManager.brushCount
+        // Galerie de brushes
+        Column {
+            width: parent.width
+            spacing: 10
 
-                Rectangle {
-                    width: 64
-                    height: 64
-                    color: brushManager.brushIndex === index ? "#bf5934" : "#2e3136"
-                    radius: 6
-                    border.color: brushManager.brushIndex === index ? "#ff8855" : "#52555b"
-                    border.width: brushManager.brushIndex === index ? 2 : 1
+            Text {
+                text: "Galerie (" + brushManager.brushCount + " pinceaux)"
+                color: "#d8dee9"
+                font.pixelSize: 13
+                font.weight: Font.Medium
+            }
 
-                    property string brushFilePath: brushManager.brushModel.data(brushManager.brushModel.index(index, 0), 259)
-                    property string brushName: brushManager.brushModel.data(brushManager.brushModel.index(index, 0), 258)
+            // Grille de brushes
+            Grid {
+                id: brushGrid
+                width: parent.width
+                columns: Math.floor(width / 72)
+                spacing: 8
+                rowSpacing: 8
 
-                    Image {
-                        id: brushImage
-                        anchors.fill: parent
-                        anchors.margins: 5
-                        source: "file://" + parent.brushFilePath
-                        fillMode: Image.PreserveAspectFit
-                        smooth: true
-                        visible: false
-                    }
+                Repeater {
+                    id: brushRepeater
+                    model: brushManager.brushCount
 
-                    MultiEffect {
-                        source: brushImage
-                        anchors.fill: brushImage
-                        maskEnabled: true
-                        maskSource: mask
-                    }
+                    Rectangle {
+                        width: 68
+                        height: 68
+                        color: brushManager.brushIndex === index ? "#2e3440" : "#1e2024"
+                        radius: 10
+                        border.color: brushManager.brushIndex === index ? "#5e81ac" : "#3a3d42"
+                        border.width: brushManager.brushIndex === index ? 2 : 1
 
-                    Item {
-                        id: mask
-                        width: brushImage.width
-                        height: brushImage.height
-                        layer.enabled: true
-                        visible: false
+                        Behavior on color { ColorAnimation { duration: 150 } }
 
-                        Rectangle {
+                        property string brushFilePath: brushManager.brushModel.data(brushManager.brushModel.index(index, 0), 259)
+                        property string brushName: brushManager.brushModel.data(brushManager.brushModel.index(index, 0), 258)
+
+                        Image {
+                            id: brushImage
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            source: "file://" + parent.brushFilePath
+                            fillMode: Image.PreserveAspectFit
+                            smooth: true
+                            visible: false
+                        }
+
+                        MultiEffect {
+                            source: brushImage
+                            anchors.fill: brushImage
+                            maskEnabled: true
+                            maskSource: mask
+                            opacity: brushMouseArea.containsMouse ? 1.0 : 0.85
+                            Behavior on opacity { NumberAnimation { duration: 100 } }
+                        }
+
+                        Item {
+                            id: mask
                             width: brushImage.width
                             height: brushImage.height
-                            radius: 6
-                            color: "black"
-                        }
-                    }
+                            layer.enabled: true
+                            visible: false
 
-                    MouseArea {
-                        id: brushMouseArea
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        hoverEnabled: true
-                        onClicked: brushManager.brushIndex = index
+                            Rectangle {
+                                width: brushImage.width
+                                height: brushImage.height
+                                radius: 8
+                                color: "black"
+                            }
+                        }
+
+                        MouseArea {
+                            id: brushMouseArea
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            hoverEnabled: true
+                            onClicked: brushManager.brushIndex = index
+                        }
                     }
                 }
             }
