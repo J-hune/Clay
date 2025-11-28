@@ -3,12 +3,14 @@
 
 #include <QQuickFramebufferObject>
 #include <QElapsedTimer>
+#include <QVector2D>
 
 #include "CameraController.h"
 #include "Grid.h"
 #include "TerrainGpu.h"
 #include "RaycastController.h"
 #include "BrushManager.h"
+#include "TerrainBrushOp.h"
 
 class GLViewport; // forward
 
@@ -85,10 +87,12 @@ private:
     // Raycast
     RaycastController m_raycastController;
     bool m_mouseMoved = false;
+    QVector2D m_lastMouseNDC{0.f, 0.f};
 
     // Brushes
     BrushManager m_brushManager;
     bool m_brushModelRefreshed = false;
+    TerrainBrushOp m_brushOp;
 
     // Redraw management
     RedrawReason m_redrawReasons = RedrawReason::None;

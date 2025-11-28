@@ -3,6 +3,7 @@
 
 #include "Grid.h"
 #include <QQuickFramebufferObject>
+#include <QtCore/QTimer>
 
 // Forward declarations
 class CameraControllerQml;
@@ -86,10 +87,16 @@ protected:
 private:
     friend class GLRenderer;
 
+    void applyBrushAtCurrentPosition();
+
     Grid m_grid;
     float m_fps = 0.f;
     bool m_drawGrid = true;
     bool m_drawAxes = true;
+    bool m_isLeftButtonPressed = false;
+
+    // Timer pour application continue du brush
+    QTimer m_brushTimer;
 
     // Pointeurs vers les composants externes
     QObject* m_cameraController = nullptr;

@@ -14,7 +14,6 @@ void RaycastControllerQml::updateMousePosition(const QPointF &localPos, float vi
         // Seuil de changement significatif pour éviter trop de raycast
         if ((newNDC - m_mouseNDC).lengthSquared() > 1e-6f) {
             m_mouseNDC = newNDC;
-            m_controller.updateMousePosition(m_mouseNDC);
             emit mouseNDCChanged();
             emit raycastRequested();
         }
@@ -22,24 +21,26 @@ void RaycastControllerQml::updateMousePosition(const QPointF &localPos, float vi
 }
 
 void RaycastControllerQml::reset() {
-    m_controller.reset();
-    if (m_lastHasHit != m_controller.hasHit()) {
-        m_lastHasHit = m_controller.hasHit();
+    if (m_lastHasHit) {
+        m_lastHasHit = false;
+        m_lastHitPosition = QVector3D();
         emit hasHitChanged();
+        emit hitPositionChanged();
     }
 }
 
-void RaycastControllerQml::notifyRaycastComplete() {
-    bool currentHasHit = m_controller.hasHit();
-    QVector3D currentHitPos = m_controller.hitPosition();
-
-    if (m_lastHasHit != currentHasHit) {
-        m_lastHasHit = currentHasHit;
+void RaycastControllerQml::notifyRaycastComplete(bool hasHit, const QVector3D &hitPosition) {
+    if (m_lastHasHit != hasHit) {
+        m_lastHasHit = hasHit;
         emit hasHitChanged();
     }
 
-    if (currentHasHit && m_lastHitPosition != currentHitPos) {
-        m_lastHitPosition = currentHitPos;
+    if (hasHit && m_lastHitPosition != hitPosition) {
+        m_lastHitPosition = hitPosition;
+        emit hitPositionChanged();
+    } else if (!hasHit) {
+        // Reset position si pas de hit
+        m_lastHitPosition = QVector3D();
         emit hitPositionChanged();
     }
 }

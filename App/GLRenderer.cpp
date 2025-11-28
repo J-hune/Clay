@@ -21,6 +21,8 @@ GLRenderer::GLRenderer(GLViewport *viewport) : m_viewport(viewport) {
     m_raycastController.initialize(this);
     m_brushManager.initialize(this);
     m_brushManager.loadFromDirectory(this, QStringLiteral("brushes"));
+    m_brushOp.initialize(this);
+    LOG_INFO() << "GLRenderer initialisé";
 }
 
 void GLRenderer::synchronize(QQuickFramebufferObject *item) {
@@ -116,6 +118,18 @@ void GLRenderer::syncTerrain() {
 void GLRenderer::syncBrushState() {
     if (!m_viewport) return;
 
+    auto* brushQml = m_viewport->brushManagerTyped();
+    if (!brushQml) return;
+
+    // On transfert les pending strokes depuis BrushManagerQml
+    const auto &qmlStrokes = brushQml->manager().pendingStrokes();
+    if (!qmlStrokes.empty()) {
+        for (const auto &stroke : qmlStrokes) {
+            m_brushManager.enqueueStroke(stroke);
+        }
+        brushQml->manager().clearPendingStrokes();
+    }
+
     if (m_brushManager.brushCount() <= 0) {
         m_brushManager.setCurrentBrushIndex(-1);
     } else if (!m_brushManager.isValidBrushIndex(m_brushManager.currentBrushIndex())) {
@@ -135,7 +149,12 @@ void GLRenderer::syncInteractionState() {
 
     auto* raycastQml = m_viewport->raycastControllerTyped();
     if (raycastQml) {
-        m_mouseMoved = true;
+        const QVector2D currentNDC = raycastQml->mouseNDC();
+        // On vérifie si la position de la souris a changé
+        if ((currentNDC - m_lastMouseNDC).lengthSquared() > 1e-6f) {
+            m_mouseMoved = true;
+            m_lastMouseNDC = currentNDC;
+        }
     }
 }
 
@@ -146,12 +165,11 @@ void GLRenderer::render() {
     bool cameraDirty = false;
     updateCamera(dt, cameraDirty);
 
-    applyPendingStrokes();
-
     if (!shouldRenderFrame(cameraDirty)) {
         return;
     }
 
+    applyPendingStrokes();
     prepareGLState();
 
     QMatrix4x4 proj, view;
@@ -201,7 +219,8 @@ void GLRenderer::updateCamera(float dt, bool &cameraDirty) {
 
 bool GLRenderer::shouldRenderFrame(bool cameraDirty) const {
     const bool hasRedrawReason = (m_redrawReasons != RedrawReason::None);
-    return hasRedrawReason || cameraDirty || m_mouseMoved;
+    const bool hasPendingStrokes = !m_brushManager.pendingStrokes().empty();
+    return hasRedrawReason || cameraDirty || m_mouseMoved || hasPendingStrokes;
 }
 
 void GLRenderer::prepareGLState() {
@@ -276,13 +295,16 @@ void GLRenderer::processRaycast(const QMatrix4x4 &proj, const QMatrix4x4 &view) 
             terrainQml->heightScale()
         );
 
-        if (m_raycastController.hasHit()) {
-            m_terrainGpu.setRaycastHit(m_raycastController.hitPosition());
-            raycastQml->notifyRaycastComplete();
+        const bool hasHit = m_raycastController.hasHit();
+        const QVector3D hitPos = m_raycastController.hitPosition();
+
+        if (hasHit) {
+            m_terrainGpu.setRaycastHit(hitPos);
+            raycastQml->notifyRaycastComplete(hasHit, hitPos);
             requestRedraw(RedrawReason::RaycastChanged);
         } else {
             m_terrainGpu.clearRaycastHit();
-            raycastQml->notifyRaycastComplete();
+            raycastQml->notifyRaycastComplete(hasHit, QVector3D());
         }
     }
 }
@@ -293,8 +315,32 @@ void GLRenderer::applyPendingStrokes() {
     const auto &strokes = m_brushManager.pendingStrokes();
     if (strokes.empty()) return;
 
-    // TODO: dans une itération suivante, appeler un compute shader dans TerrainGpu
+    auto* terrainQml = m_viewport->terrainManagerTyped();
+    if (!terrainQml) return;
+
+    for (const auto &stroke : strokes) {
+        if (!m_brushManager.isValidBrushIndex(stroke.brushIndex)) continue;
+
+        const auto opType = static_cast<BrushOpType>(stroke.operation);
+
+        m_brushOp.applyBrush(
+            this,
+            opType,
+            m_terrainGpu.heightmapTexture(),
+            terrainQml->heightmapResolution(),
+            stroke.worldPos,
+            stroke.size,
+            stroke.strength,
+            m_brushManager.brushTextureArrayId(),
+            stroke.brushIndex,
+            -50.0f, 50.0f,
+            -50.0f, 50.0f,
+            terrainQml->heightScale()
+        );
+    }
+
     m_brushManager.clearPendingStrokes();
+    requestRedraw(RedrawReason::TerrainChanged);
 }
 
 void GLRenderer::finalizeFrame() {

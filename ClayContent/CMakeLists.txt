@@ -12,6 +12,7 @@ qt6_add_qml_module(ClayContent
         "components/DebugOverlay.qml"
         "components/GridControl.qml"
         "components/BrushSection.qml"
+        "components/BrushOperations.qml"
         "components/RightBar.qml"
         "components/CustomSlider.qml"
     RESOURCES

@@ -286,20 +286,6 @@ Rectangle {
                         textColor: "#d8dee9"
                         onValueChanged: terrainManager.heightScale = value
                     }
-                }
-
-                // Paramètres Heightmap (visible uniquement en mode Heightmap)
-                Column {
-                    width: parent.width
-                    spacing: 10
-                    visible: terrainManager.mode === 1
-
-                    Text {
-                        text: "Heightmap"
-                        color: "#d8dee9"
-                        font.pixelSize: 13
-                        font.weight: Font.Medium
-                    }
 
                     Row {
                         width: parent.width
@@ -307,7 +293,7 @@ Rectangle {
 
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "Résolution:"
+                            text: "Résolution heightmap:"
                             color: "#a0a0a0"
                             font.pixelSize: 12
                         }
@@ -375,6 +361,20 @@ Rectangle {
                                 hoverEnabled: true
                             }
                         }
+                    }
+                }
+
+                // Paramètres Heightmap (visible uniquement en mode Heightmap)
+                Column {
+                    width: parent.width
+                    spacing: 10
+                    visible: terrainManager.mode === 1
+
+                    Text {
+                        text: "Fichier heightmap"
+                        color: "#d8dee9"
+                        font.pixelSize: 13
+                        font.weight: Font.Medium
                     }
 
                     Rectangle {

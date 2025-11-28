@@ -22,8 +22,8 @@ public:
     const RaycastController& controller() const { return m_controller; }
 
     // Getters pour Q_PROPERTY
-    bool hasHit() const { return m_controller.hasHit(); }
-    QVector3D hitPosition() const { return m_controller.hitPosition(); }
+    bool hasHit() const { return m_lastHasHit; }
+    QVector3D hitPosition() const { return m_lastHitPosition; }
     QVector2D mouseNDC() const { return m_mouseNDC; }
 
     // Méthodes invocables depuis QML
@@ -31,7 +31,7 @@ public:
     Q_INVOKABLE void reset();
 
     // Pour notifier les changements après le raycast (appelé par GLRenderer)
-    void notifyRaycastComplete();
+    void notifyRaycastComplete(bool hasHit, const QVector3D &hitPosition);
 
 signals:
     void hasHitChanged();
