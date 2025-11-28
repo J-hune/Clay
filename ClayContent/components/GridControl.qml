@@ -235,7 +235,7 @@ Rectangle {
                 label: "Résolution grille"
                 decimals: 0
                 primaryColor: "#5e81ac"
-                textColor: "#fff"
+                textColor: "#d8dee9"
                 onValueChanged: glView.gridResolution = Math.round(value)
             }
 
@@ -249,7 +249,7 @@ Rectangle {
                 label: "Sensibilité souris"
                 decimals: 2
                 primaryColor: "#5e81ac"
-                textColor: "#fff"
+                textColor: "#d8dee9"
                 onValueChanged: cameraController.mouseSensitivity = value
             }
         }
