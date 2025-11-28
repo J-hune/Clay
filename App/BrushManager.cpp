@@ -183,7 +183,12 @@ void BrushManager::enqueueStroke(const QVector3D &worldPos) {
     s.brushIndex = m_currentBrushIndex;
     s.size = m_brushSize;
     s.strength = m_brushStrength;
+    s.operation = m_operation;
     m_pendingStrokes.push_back(s);
+}
+
+void BrushManager::enqueueStroke(const PendingStroke &stroke) {
+    m_pendingStrokes.push_back(stroke);
 }
 
 void BrushManager::removeBrush(const int brushIndex) {
@@ -191,3 +196,14 @@ void BrushManager::removeBrush(const int brushIndex) {
     m_brushes[static_cast<size_t>(brushIndex)].valid = false;
     // On laisse les données GPU en place pour éviter de recaler tout l'array.
 }
+
+void BrushManager::copyBrushesFrom(const BrushManager &other) {
+    // Copie les descripteurs de brushes (mais pas les textures GPU)
+    m_brushes = other.m_brushes;
+    m_maxBrushes = other.m_maxBrushes;
+    m_brushTextureSize = other.m_brushTextureSize;
+    m_texArray = other.m_texArray; // Partage la même texture array
+
+    LOG_INFO() << "BrushManager synchronized: " << m_brushes.size() << " brushes copied";
+}
+

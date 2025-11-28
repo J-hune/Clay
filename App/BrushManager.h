@@ -3,8 +3,8 @@
 
 #include <vector>
 #include <QImage>
-#include <QOpenGLFunctions>
-#include <QVector3D>
+
+#include "TerrainBrushOp.h"
 
 struct BrushDescriptor {
     int id = -1;              // index dans le texture array
@@ -18,6 +18,7 @@ struct PendingStroke {
     int brushIndex = 0;
     float size = 1.0f;
     float strength = 1.0f;
+    BrushOpType operation = BrushOpType::Raise;
 };
 
 class BrushManager {
@@ -50,11 +51,17 @@ public:
     float brushSize() const { return m_brushSize; }
     void setBrushStrength(float s) { m_brushStrength = s; }
     float brushStrength() const { return m_brushStrength; }
+    void setOperation(BrushOpType op) { m_operation = op; }
+    BrushOpType operation() const { return m_operation; }
 
     // Gestion des strokes (file d'actions à appliquer)
     void enqueueStroke(const QVector3D &worldPos);
+    void enqueueStroke(const PendingStroke &stroke); // Pour transfert depuis BrushManagerQml
     const std::vector<PendingStroke> &pendingStrokes() const { return m_pendingStrokes; }
     void clearPendingStrokes() { m_pendingStrokes.clear(); }
+
+    // Synchronisation des brushes (pour BrushManagerQml)
+    void copyBrushesFrom(const BrushManager &other);
 
 private:
     bool uploadBrush(QOpenGLFunctions *gl, int layerIndex, const QImage &img);
@@ -68,6 +75,7 @@ private:
     int m_currentBrushIndex = 0;
     float m_brushSize = 2.0f;
     float m_brushStrength = 1.0f;
+    BrushOpType m_operation = BrushOpType::Raise;
 
     // File de strokes à appliquer
     std::vector<PendingStroke> m_pendingStrokes;

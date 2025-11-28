@@ -12,6 +12,10 @@ GLViewport::GLViewport(QQuickItem *parent) : QQuickFramebufferObject(parent) {
     setFlag(ItemIsFocusScope, true);
     setFlag(ItemAcceptsInputMethod, true);
     setFocus(true);
+
+    // Configuration du timer pour l'application continue du brush
+    m_brushTimer.setInterval(16); // ~60 FPS
+    connect(&m_brushTimer, &QTimer::timeout, this, &GLViewport::applyBrushAtCurrentPosition);
 }
 
 void GLViewport::setFpsFromRenderer(float fps) {
@@ -99,6 +103,20 @@ void GLViewport::keyReleaseEvent(QKeyEvent *event) {
 }
 
 void GLViewport::mousePressEvent(QMouseEvent *event) {
+    if (event->button() == Qt::LeftButton) {
+        m_isLeftButtonPressed = true;
+        auto *raycast = raycastControllerTyped();
+        auto *brush = brushManagerTyped();
+        auto *camera = cameraControllerTyped();
+
+        if (raycast && brush && raycast->hasHit() && camera && !camera->isMovingCamera()) {
+            brush->enqueueStroke(raycast->hitPosition());
+            if (!m_brushTimer.isActive()) {
+                m_brushTimer.start();
+            }
+        }
+    }
+
     if (auto *camera = cameraControllerTyped()) {
         camera->handleMousePress(event, window());
     }
@@ -115,6 +133,11 @@ void GLViewport::mouseMoveEvent(QMouseEvent *event) {
             const QRect rect(itemPosInWindow, QSize(static_cast<int>(width()), static_cast<int>(height())));
 
             camera->handleMouseMove(event, const_cast<QQuickWindow *>(w), localPos, rect);
+
+            // On arrête le timer si on commence à bouger la caméra
+            if (camera->isMovingCamera() && m_brushTimer.isActive()) {
+                m_brushTimer.stop();
+            }
         }
     }
 
@@ -125,6 +148,15 @@ void GLViewport::mouseMoveEvent(QMouseEvent *event) {
             const QPoint localPos = w->mapFromGlobal(QCursor::pos());
             const QPointF itemPos = mapFromScene(localPos);
             raycast->updateMousePosition(itemPos, static_cast<float>(width()), static_cast<float>(height()));
+
+            // On applique le brush si le clic gauche est maintenu
+            if (m_isLeftButtonPressed) {
+                auto *brush = brushManagerTyped();
+                auto *camera = cameraControllerTyped();
+                if (raycast->hasHit() && brush && camera && !camera->isMovingCamera()) {
+                    brush->enqueueStroke(raycast->hitPosition());
+                }
+            }
         }
     }
 
@@ -132,6 +164,11 @@ void GLViewport::mouseMoveEvent(QMouseEvent *event) {
 }
 
 void GLViewport::mouseReleaseEvent(QMouseEvent *event) {
+    if (event->button() == Qt::LeftButton) {
+        m_isLeftButtonPressed = false;
+        m_brushTimer.stop();
+    }
+
     if (auto *camera = cameraControllerTyped()) {
         camera->handleMouseRelease(event, window());
     }
@@ -157,6 +194,28 @@ void GLViewport::hoverMoveEvent(QHoverEvent *event) {
         const QPointF localPosF = event->position();
         raycast->updateMousePosition(localPosF, static_cast<float>(width()), static_cast<float>(height()));
         update();
+    }
+}
+
+void GLViewport::applyBrushAtCurrentPosition() {
+    auto *raycast = raycastControllerTyped();
+    auto *brush = brushManagerTyped();
+    auto *camera = cameraControllerTyped();
+
+    // On applique le brush si toutes les conditions sont remplies
+    if (m_isLeftButtonPressed && raycast && brush && camera &&
+        raycast->hasHit() && !camera->isMovingCamera()) {
+        brush->enqueueStroke(raycast->hitPosition());
+        update();
+
+        if (window()) {
+            window()->update();
+        }
+    } else {
+        // Si les conditions ne sont plus remplies, on arrête le timer
+        if (m_brushTimer.isActive()) {
+            m_brushTimer.stop();
+        }
     }
 }
 

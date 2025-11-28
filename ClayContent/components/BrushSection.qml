@@ -121,6 +121,17 @@ Rectangle {
                     textColor: "#d8dee9"
                     onValueChanged: brushManager.brushStrength = value
                 }
+
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: "#3a3d42"
+                }
+
+                BrushOperations {
+                    width: parent.width
+                    brushManager: brushSection.parent.brushManager
+                }
             }
         }
 

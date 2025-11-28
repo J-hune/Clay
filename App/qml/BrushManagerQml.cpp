@@ -22,11 +22,19 @@ void BrushManagerQml::setBrushStrength(float strength) {
     emit brushStrengthChanged();
 }
 
+void BrushManagerQml::setBrushOperation(int op) {
+    if (static_cast<int>(m_manager.operation()) == op) return;
+    m_manager.setOperation(static_cast<BrushOpType>(op));
+    emit brushOperationChanged();
+}
+
 void BrushManagerQml::enqueueStroke(const QVector3D &worldPos) {
     m_manager.enqueueStroke(worldPos);
 }
 
 void BrushManagerQml::refreshBrushModel(const BrushManager &manager) {
+    m_manager.copyBrushesFrom(manager);
+
     m_brushModel.updateFromManager(manager);
     emit brushCountChanged();
     emit brushModelChanged();
