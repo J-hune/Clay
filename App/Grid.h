@@ -40,10 +40,11 @@ public:
         if (drawAxes) {
             // Axes
             f->glLineWidth(2.0f);
+            constexpr float yOffset = +0.01f;
             const GLfloat axes[] = {
-                -half, 0.0f, 0.0f, half, 0.0f, 0.0f,
-                0.0f, 0.0f, -half, 0.0f, 0.0f, half,
-                0.0f, 0.0f, 0.0f, 0.0f, 2.0f, 0.0f
+                -half, yOffset, 0.0f, half, yOffset, 0.0f,
+                0.0f, yOffset, -half, 0.0f, yOffset, half,
+                0.0f, yOffset, 0.0f, 0.0f, 2.0f, 0.0f
             };
             // On dessine X
             glColor3f(1.0f, 0.2f, 0.2f);
@@ -70,20 +71,21 @@ private:
         // On reconstruit les deux ensembles de lignes
         const int N = m_resolution;
         constexpr float step = 1.0f;
+        constexpr float yOffset = +0.01f; // Légère offset pour éviter le z-fighting avec le terrain
         const int lineCount = 2 * N + 1;
 
         m_linesX.clear(); m_linesX.reserve(lineCount * 6);
         for (int i = -N; i <= N; ++i) {
             float z = static_cast<float>(i) * step;
-            m_linesX.push_back(-N * step); m_linesX.push_back(0.0f); m_linesX.push_back(z);
-            m_linesX.push_back( N * step); m_linesX.push_back(0.0f); m_linesX.push_back(z);
+            m_linesX.push_back(-N * step); m_linesX.push_back(yOffset); m_linesX.push_back(z);
+            m_linesX.push_back( N * step); m_linesX.push_back(yOffset); m_linesX.push_back(z);
         }
 
         m_linesZ.clear(); m_linesZ.reserve(lineCount * 6);
         for (int i = -N; i <= N; ++i) {
             float x = static_cast<float>(i) * step;
-            m_linesZ.push_back(x); m_linesZ.push_back(0.0f); m_linesZ.push_back(-N * step);
-            m_linesZ.push_back(x); m_linesZ.push_back(0.0f); m_linesZ.push_back( N * step);
+            m_linesZ.push_back(x); m_linesZ.push_back(yOffset); m_linesZ.push_back(-N * step);
+            m_linesZ.push_back(x); m_linesZ.push_back(yOffset); m_linesZ.push_back( N * step);
         }
 
         m_dirty = false;
