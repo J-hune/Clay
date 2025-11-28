@@ -84,7 +84,7 @@ Rectangle {
 
             // Contrôles
             Column {
-                width: parent.width - 160
+                width: parent.width - 108 - 20
                 spacing: 10
 
                 Text {
@@ -158,17 +158,19 @@ Rectangle {
             Grid {
                 id: brushGrid
                 width: parent.width
-                columns: Math.floor(width / 72)
-                spacing: 8
-                rowSpacing: 8
+                property int cellSize: 68
+                property int cellSpacing: 8
+                columns: Math.max(1, Math.floor((width + cellSpacing) / (cellSize + cellSpacing)))
+                spacing: cellSpacing
+                rowSpacing: cellSpacing
 
                 Repeater {
                     id: brushRepeater
                     model: brushManager.brushCount
 
                     Rectangle {
-                        width: 68
-                        height: 68
+                        width: brushGrid.cellSize
+                        height: brushGrid.cellSize
                         color: brushManager.brushIndex === index ? "#2e3440" : "#1e2024"
                         radius: 10
                         border.color: brushManager.brushIndex === index ? "#5e81ac" : "#3a3d42"

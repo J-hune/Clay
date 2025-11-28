@@ -9,9 +9,9 @@ Column {
 
     Text {
         text: "Operations"
-        color: "#d3d6da"
-        font.pixelSize: 14
-        font.bold: true
+        color: "#d8dee9"
+        font.pixelSize: 13
+        font.weight: Font.Medium
     }
 
     Row {
@@ -27,7 +27,7 @@ Column {
 
             Button {
                 id: opButton
-                width: (parent.width - 18) / 3
+                width: (parent.width - 6 * (3 - 1)) / 3
                 height: 50
 
                 property bool isActive: brushManager.brushOperation === modelData.op
