@@ -5,7 +5,7 @@
 
 /**
  * @brief Wrapper QObject pour RaycastController, exposable au QML
- * Gère le raycast GPU et expose les résultats
+ * Ne possède PAS son propre RaycastController, mais agit comme proxy vers une instance partagée
  */
 class RaycastControllerQml : public QObject {
     Q_OBJECT
@@ -17,9 +17,9 @@ class RaycastControllerQml : public QObject {
 public:
     explicit RaycastControllerQml(QObject *parent = nullptr);
 
-    // Accès au contrôleur interne (pour GLRenderer)
-    RaycastController& controller() { return m_controller; }
-    const RaycastController& controller() const { return m_controller; }
+    // Injection du RaycastController partagé (appelé par GLRenderer)
+    void setSharedController(RaycastController *controller);
+    RaycastController* sharedController() const { return m_sharedController; }
 
     // Getters pour Q_PROPERTY
     bool hasHit() const { return m_lastHasHit; }
@@ -40,7 +40,7 @@ signals:
     void raycastRequested(); // Signal pour indiquer qu'un raycast est nécessaire
 
 private:
-    RaycastController m_controller;
+    RaycastController *m_sharedController = nullptr;  // Référence partagée
     QVector2D m_mouseNDC{0.f, 0.f};
     bool m_lastHasHit = false;
     QVector3D m_lastHitPosition;

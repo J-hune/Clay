@@ -39,6 +39,15 @@ QHash<int, QByteArray> BrushListModel::roleNames() const {
 
 void BrushListModel::updateFromManager(const BrushManager &manager) {
     beginResetModel();
-    m_brushes = manager.brushes();
+    
+    // Filtrer uniquement les brushes valides
+    m_brushes.clear();
+    const auto &allBrushes = manager.brushes();
+    for (const auto &brush : allBrushes) {
+        if (brush.valid) {
+            m_brushes.push_back(brush);
+        }
+    }
+    
     endResetModel();
 }

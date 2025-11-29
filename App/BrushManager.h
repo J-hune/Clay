@@ -11,6 +11,7 @@ struct BrushDescriptor {
     QString name;             // nom affichable
     QString filePath;         // chemin d'origine
     bool valid = false;       // slot occupé
+    bool needsUpload = false; // Marqueur pour upload différé
 };
 
 struct PendingStroke {
@@ -26,17 +27,23 @@ public:
     BrushManager() = default;
     ~BrushManager() = default;
 
-    void initialize(QOpenGLFunctions *gl, int maxBrushes = 32, int brushTextureSize = 128);
-    void destroy(QOpenGLFunctions *gl);
+    void initialize(int maxBrushes = 32, int brushTextureSize = 128);
+    void destroy();
 
     // Chargement initial depuis un dossier ("brushes" par défaut)
-    void loadFromDirectory(QOpenGLFunctions *gl, const QString &directoryPath);
+    void loadFromDirectory(const QString &directoryPath);
 
-    // Ajout dynamique d'un brush
-    int addBrushFromFile(QOpenGLFunctions *gl, const QString &filePath);
+    // Ajout dynamique d'un brush (le fichier doit être déjà dans le dossier géré par l'app)
+    int addBrushFromFile(const QString &filePath);
 
-    // Invalidation d'un brush
+    // Ajout dynamique d'un brush depuis un fichier externe : copie dans le dossier de stockage puis upload
+    int addBrushFromExternalFile(const QString &sourcePath);
+
+    // Invalidation d'un brush (ne supprime pas le fichier)
     void removeBrush(int brushIndex);
+
+    // Supprime le brush et tente de supprimer aussi le fichier physique associé
+    bool removeBrushAndFile(int brushIndex);
 
     GLuint brushTextureArrayId() const { return m_texArray; }
     int brushCount() const { return static_cast<int>(m_brushes.size()); }
@@ -54,17 +61,20 @@ public:
     void setOperation(BrushOpType op) { m_operation = op; }
     BrushOpType operation() const { return m_operation; }
 
+    // Permet de définir ou récupérer le dossier de stockage des brushes
+    void setStorageDirectory(const QString &dir) { m_storageDir = dir; }
+    QString storageDirectory() const { return m_storageDir; }
+
     // Gestion des strokes (file d'actions à appliquer)
     void enqueueStroke(const QVector3D &worldPos);
-    void enqueueStroke(const PendingStroke &stroke); // Pour transfert depuis BrushManagerQml
     const std::vector<PendingStroke> &pendingStrokes() const { return m_pendingStrokes; }
     void clearPendingStrokes() { m_pendingStrokes.clear(); }
 
-    // Synchronisation des brushes (pour BrushManagerQml)
-    void copyBrushesFrom(const BrushManager &other);
+    // Upload des brushes en attente (appelé dans le thread de rendu)
+    void uploadPendingBrushes();
 
 private:
-    bool uploadBrush(QOpenGLFunctions *gl, int layerIndex, const QImage &img);
+    bool uploadBrush(int layerIndex, const QImage &img);
 
     GLuint m_texArray = 0;
     int m_maxBrushes = 0;
@@ -79,6 +89,9 @@ private:
 
     // File de strokes à appliquer
     std::vector<PendingStroke> m_pendingStrokes;
+
+    // Dossier de stockage des brushes
+    QString m_storageDir;
 };
 
 #endif // CLAYAPP_BRUSHMANAGER_H

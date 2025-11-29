@@ -8,18 +8,20 @@
 // Grille de référence au sol (Y=0)
 class Grid {
 public:
+    Grid() {
+        rebuildVertices();
+    }
     void setResolution(int r) {
         r = qBound(1, r, 10000);
         if (m_resolution == r) return;
         m_resolution = r;
-        m_dirty = true; // On marque le besoin de reconstruire
+        rebuildVertices();
     }
 
     int resolution() const { return m_resolution; }
 
     // Ajout de paramètres pour activer/désactiver l'affichage
-    void draw(QOpenGLFunctions *f, const bool drawGrid, const bool drawAxes) {
-        if (m_dirty) rebuildVertices();
+    void draw(QOpenGLFunctions *f, const bool drawGrid, const bool drawAxes) const {
         const int N = m_resolution;
         const float half = static_cast<float>(N);
 
@@ -87,12 +89,9 @@ private:
             m_linesZ.push_back(x); m_linesZ.push_back(yOffset); m_linesZ.push_back(-N * step);
             m_linesZ.push_back(x); m_linesZ.push_back(yOffset); m_linesZ.push_back( N * step);
         }
-
-        m_dirty = false;
     }
 
     int m_resolution = 50;
-    bool m_dirty = true;
     QVector<float> m_linesX; // On stocke les sommets des lignes X
     QVector<float> m_linesZ; // On stocke les sommets des lignes Z
 };

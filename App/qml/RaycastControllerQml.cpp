@@ -4,6 +4,10 @@ RaycastControllerQml::RaycastControllerQml(QObject *parent)
     : QObject(parent) {
 }
 
+void RaycastControllerQml::setSharedController(RaycastController *controller) {
+    m_sharedController = controller;
+}
+
 void RaycastControllerQml::updateMousePosition(const QPointF &localPos, float viewportWidth, float viewportHeight) {
     if (viewportWidth > 0.f && viewportHeight > 0.f) {
         const QVector2D newNDC(

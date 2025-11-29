@@ -10,17 +10,35 @@
 #include "ImageUtils.h"
 #include "Log.h"
 #include <QOpenGLFramebufferObjectFormat>
-#include <QQuickWindow>
-#include <QMatrix4x4>
-#include <QtGlobal>
+#include <QDir>
 
 GLRenderer::GLRenderer(GLViewport *viewport) : m_viewport(viewport) {
     initializeOpenGLFunctions();
     m_timer.start();
     m_terrainGpu.initialize(this);
     m_raycastController.initialize(this);
-    m_brushManager.initialize(this);
-    m_brushManager.loadFromDirectory(this, QStringLiteral("brushes"));
+    m_brushManager.initialize();
+
+    // Configure le dossier de stockage des brushes à <exe>/brushes
+    const QString exeDir = QCoreApplication::applicationDirPath();
+    const QString brushesDir = QDir(exeDir).filePath(QStringLiteral("brushes"));
+    m_brushManager.setStorageDirectory(brushesDir);
+    m_brushManager.loadFromDirectory(brushesDir);
+
+    // Injection des instances partagées dans les wrappers QML
+    if (auto* brushQml = m_viewport->brushManagerTyped()) {
+        brushQml->setSharedManager(&m_brushManager);
+        brushQml->refreshBrushModel();
+    }
+
+    if (auto* raycastQml = m_viewport->raycastControllerTyped()) {
+        raycastQml->setSharedController(&m_raycastController);
+    }
+
+    if (auto* cameraQml = m_viewport->cameraControllerTyped()) {
+        cameraQml->setSharedController(&m_cameraController);
+    }
+
     m_brushOp.initialize(this);
     LOG_INFO() << "GLRenderer initialisé";
 }
@@ -34,7 +52,6 @@ void GLRenderer::synchronize(QQuickFramebufferObject *item) {
 
     syncViewportState();
     syncTerrain();
-    syncBrushState();
     syncInteractionState();
 }
 
@@ -44,33 +61,20 @@ void GLRenderer::syncViewportState() {
     // FPS -> viewport
     m_viewport->setFpsFromRenderer(m_fpsAccum);
 
-    // Résolution grille
-    m_grid.setResolution(m_viewport->gridResolution());
-
     // Flags affichage
     m_drawGrid = m_viewport->drawGrid();
     m_drawAxes = m_viewport->drawAxes();
 
-    // Synchronisation des paramètres de brush depuis BrushManagerQml
-    auto* brushQml = m_viewport->brushManagerTyped();
-    if (brushQml) {
-        // Rafraîchir le modèle de brushes une fois que les brushes sont chargés
-        if (!m_brushModelRefreshed && m_brushManager.brushCount() > 0) {
-            brushQml->refreshBrushModel(m_brushManager);
-            m_brushModelRefreshed = true;
-        }
-
-        m_brushManager.setCurrentBrushIndex(brushQml->brushIndex());
-        m_brushManager.setBrushSize(brushQml->brushSize());
-        m_brushManager.setBrushStrength(brushQml->brushStrength());
-    }
+    // Upload des brushes en attente (dans le thread de rendu)
+    m_brushManager.uploadPendingBrushes();
 
     // Détection des changements
-    if (m_prevGridResolution != m_grid.resolution() ||
+    const int currentGridRes = m_viewport->grid().resolution();
+    if (m_prevGridResolution != currentGridRes ||
         m_prevDrawGrid != m_drawGrid ||
         m_prevDrawAxes != m_drawAxes) {
         requestRedraw(RedrawReason::GridChanged);
-        m_prevGridResolution = m_grid.resolution();
+        m_prevGridResolution = currentGridRes;
         m_prevDrawGrid = m_drawGrid;
         m_prevDrawAxes = m_drawAxes;
     }
@@ -113,30 +117,8 @@ void GLRenderer::syncTerrain() {
         m_terrainReady = true;
         requestRedraw(RedrawReason::TerrainChanged);
     }
-}
 
-void GLRenderer::syncBrushState() {
-    if (!m_viewport) return;
-
-    auto* brushQml = m_viewport->brushManagerTyped();
-    if (!brushQml) return;
-
-    // On transfert les pending strokes depuis BrushManagerQml
-    const auto &qmlStrokes = brushQml->manager().pendingStrokes();
-    if (!qmlStrokes.empty()) {
-        for (const auto &stroke : qmlStrokes) {
-            m_brushManager.enqueueStroke(stroke);
-        }
-        brushQml->manager().clearPendingStrokes();
-    }
-
-    if (m_brushManager.brushCount() <= 0) {
-        m_brushManager.setCurrentBrushIndex(-1);
-    } else if (!m_brushManager.isValidBrushIndex(m_brushManager.currentBrushIndex())) {
-        m_brushManager.setCurrentBrushIndex(0);
-    }
-
-    // Propager les paramètres de brush vers le GPU terrain
+    // Mise à jour de la prévisualisation du brush
     m_terrainGpu.setBrushPreview(
         m_brushManager.currentBrushIndex(),
         m_brushManager.brushSize(),
@@ -198,22 +180,11 @@ void GLRenderer::updateFPS(float dt) {
 }
 
 void GLRenderer::updateCamera(float dt, bool &cameraDirty) {
-    if (!m_viewport) {
-        cameraDirty = false;
-        return;
-    }
-
-    auto* cameraQml = m_viewport->cameraControllerTyped();
-    if (!cameraQml) {
-        cameraDirty = false;
-        return;
-    }
-
-    cameraQml->controller().update(dt);
-    cameraDirty = cameraQml->controller().camera().isDirty();
+    m_cameraController.update(dt);
+    cameraDirty = m_cameraController.camera().isDirty();
 
     if (cameraDirty) {
-        cameraQml->controller().camera().clearDirty();
+        m_cameraController.camera().clearDirty();
     }
 }
 
@@ -235,11 +206,7 @@ void GLRenderer::computeMatrices(QMatrix4x4 &proj, QMatrix4x4 &view) {
     const int h = framebufferObject()->height();
 
     updateProjectionMatrix(w, h, proj);
-
-    if (m_viewport) {
-        auto* cameraQml = m_viewport->cameraControllerTyped();
-        if (cameraQml) updateViewMatrix(cameraQml->controller().camera(), view);
-    }
+    updateViewMatrix(m_cameraController.camera(), view);
 }
 
 void GLRenderer::updateProjectionMatrix(int width, int height, QMatrix4x4 &proj) {
@@ -258,7 +225,7 @@ void GLRenderer::drawScene(const QMatrix4x4 &proj, const QMatrix4x4 &view) {
     glMatrixMode(GL_MODELVIEW);
     glLoadMatrixf(view.constData());
 
-    m_grid.draw(this, m_drawGrid, m_drawAxes);
+    m_viewport->grid().draw(this, m_drawGrid, m_drawAxes);
 
     if (m_terrainReady) {
         m_terrainGpu.setBrushTextureArray(m_brushManager.brushTextureArrayId());
@@ -269,14 +236,13 @@ void GLRenderer::drawScene(const QMatrix4x4 &proj, const QMatrix4x4 &view) {
 void GLRenderer::processRaycast(const QMatrix4x4 &proj, const QMatrix4x4 &view) {
     if (!m_terrainReady || !m_viewport) return;
 
-    auto* cameraQml = m_viewport->cameraControllerTyped();
     auto* raycastQml = m_viewport->raycastControllerTyped();
     auto* terrainQml = m_viewport->terrainManagerTyped();
 
-    if (!cameraQml || !raycastQml || !terrainQml) return;
+    if (!raycastQml || !terrainQml) return;
 
     // Si la caméra bouge, on réinitialise le raycast
-    if (cameraQml->isMovingCamera()) {
+    if (m_cameraController.isMovingCamera()) {
         m_terrainGpu.clearRaycastHit();
         m_raycastController.reset();
         raycastQml->reset();

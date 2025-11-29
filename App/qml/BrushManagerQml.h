@@ -3,10 +3,11 @@
 
 #include "../BrushManager.h"
 #include "BrushListModel.h"
+#include <QList>
 
 /**
  * @brief Wrapper QObject pour BrushManager, exposable au QML
- * Gère l'état des brushes et expose les propriétés
+ * Ne possède PAS son propre BrushManager, mais agit comme proxy vers une instance partagée
  */
 class BrushManagerQml : public QObject {
     Q_OBJECT
@@ -21,15 +22,15 @@ class BrushManagerQml : public QObject {
 public:
     explicit BrushManagerQml(QObject *parent = nullptr);
 
-    // Accès au manager interne (pour GLRenderer)
-    BrushManager& manager() { return m_manager; }
-    const BrushManager& manager() const { return m_manager; }
+    // Injection du BrushManager partagé (appelé par GLRenderer)
+    void setSharedManager(BrushManager *manager);
+    BrushManager* sharedManager() const { return m_sharedManager; }
 
     // Getters pour Q_PROPERTY
-    int brushIndex() const { return m_manager.currentBrushIndex(); }
-    float brushSize() const { return m_manager.brushSize(); }
-    float brushStrength() const { return m_manager.brushStrength(); }
-    int brushOperation() const { return static_cast<int>(m_manager.operation()); }
+    int brushIndex() const;
+    float brushSize() const;
+    float brushStrength() const;
+    int brushOperation() const;
     int brushCount() const { return m_brushModel.rowCount(); }
     BrushListModel* brushModel() { return &m_brushModel; }
 
@@ -42,8 +43,13 @@ public:
     // Méthodes invocables depuis QML
     Q_INVOKABLE void enqueueStroke(const QVector3D &worldPos);
 
+    // Ajout / suppression depuis l'UI (QML)
+    Q_INVOKABLE void requestAddBrush(const QString &filePath);
+    Q_INVOKABLE void requestRemoveBrush(int index);
+    Q_INVOKABLE void requestShowBrushInFolder(int index);
+
     // Appelé par GLRenderer après loadFromDirectory pour mettre à jour le modèle
-    void refreshBrushModel(const BrushManager &manager);
+    void refreshBrushModel();
 
 signals:
     void brushIndexChanged();
@@ -54,7 +60,7 @@ signals:
     void brushModelChanged();
 
 private:
-    BrushManager m_manager;
+    BrushManager *m_sharedManager = nullptr;
     BrushListModel m_brushModel;
 };
 

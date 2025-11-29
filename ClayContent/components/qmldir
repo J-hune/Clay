@@ -7,6 +7,7 @@ GridControl 1.0 GridControl.qml
 CameraSection 1.0 CameraSection.qml
 BrushSection 1.0 BrushSection.qml
 BrushOperations 1.0 BrushOperations.qml
+BrushContextMenu 1.0 BrushContextMenu.qml
 RightBar 1.0 RightBar.qml
 CustomSlider 1.0 CustomSlider.qml
 
