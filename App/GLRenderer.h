@@ -6,7 +6,6 @@
 #include <QVector2D>
 
 #include "CameraController.h"
-#include "Grid.h"
 #include "TerrainGpu.h"
 #include "RaycastController.h"
 #include "BrushManager.h"
@@ -45,7 +44,6 @@ private:
     void syncViewportState();
     void syncTerrain();
     void syncInteractionState();
-    void syncBrushState();
 
     // Render helpers
     float computeDeltaTime();
@@ -71,7 +69,6 @@ private:
 private:
     QElapsedTimer m_timer;
     GLViewport *m_viewport = nullptr;
-    Grid m_grid;
     bool m_drawGrid = true;
     bool m_drawAxes = true;
     float m_fpsAccum = -1.f;
@@ -84,17 +81,15 @@ private:
     bool m_prevDrawGrid = true;
     bool m_prevDrawAxes = true;
 
-    // Raycast
-    RaycastController m_raycastController;
     bool m_mouseMoved = false;
     QVector2D m_lastMouseNDC{0.f, 0.f};
 
-    // Brushes
+    // (instances partagées)
+    CameraController m_cameraController;
+    RaycastController m_raycastController;
     BrushManager m_brushManager;
-    bool m_brushModelRefreshed = false;
-    TerrainBrushOp m_brushOp;
 
-    // Redraw management
+    TerrainBrushOp m_brushOp;
     RedrawReason m_redrawReasons = RedrawReason::None;
 };
 

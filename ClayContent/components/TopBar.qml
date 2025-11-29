@@ -46,8 +46,8 @@ Rectangle {
 
                 Image {
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 18
-                    height: 18
+                    sourceSize.width: 18
+                    sourceSize.height: 18
                     source: "../images/layer-plus.svg"
                     fillMode: Image.PreserveAspectFit
                     opacity: terrainMouseArea.containsMouse ? 1.0 : 0.7

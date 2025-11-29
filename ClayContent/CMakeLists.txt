@@ -13,6 +13,7 @@ qt6_add_qml_module(ClayContent
         "components/GridControl.qml"
         "components/BrushSection.qml"
         "components/BrushOperations.qml"
+        "components/BrushContextMenu.qml"
         "components/RightBar.qml"
         "components/CustomSlider.qml"
     RESOURCES
@@ -23,6 +24,9 @@ qt6_add_qml_module(ClayContent
         "images/grid.svg"
         "images/empty_axis.svg"
         "images/chevron-down.svg"
+        "images/plus.svg"
+        "images/circle-xmark.svg"
+        "images/folder-magnifying-glass.svg"
         "fonts/OpenSans-Regular.ttf"
         "fonts/OpenSans-SemiBold.ttf"
         "components/qmldir"

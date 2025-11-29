@@ -6,7 +6,7 @@
 
 /**
  * @brief Wrapper QObject pour CameraController, exposable au QML
- * Gère tous les événements de la caméra et expose les propriétés
+ * Ne possède PAS son propre CameraController, mais agit comme proxy vers une instance partagée
  */
 class CameraControllerQml : public QObject {
     Q_OBJECT
@@ -26,22 +26,22 @@ class CameraControllerQml : public QObject {
 public:
     explicit CameraControllerQml(QObject *parent = nullptr);
 
-    // Accès au contrôleur interne (pour GLRenderer)
-    CameraController& controller() { return m_controller; }
-    const CameraController& controller() const { return m_controller; }
+    // Injection du CameraController partagé (appelé par GLRenderer)
+    void setSharedController(CameraController *controller);
+    CameraController* sharedController() const { return m_sharedController; }
 
     // Getters pour Q_PROPERTY
-    QVector3D position() const { return m_controller.camera().position(); }
-    float yaw() const { return m_controller.camera().yaw(); }
-    float pitch() const { return m_controller.camera().pitch(); }
-    float speed() const { return m_controller.speed(); }
-    float mouseSensitivity() const { return m_controller.mouseSensitivity(); }
-    float orbitDistance() const { return m_controller.orbitDistance(); }
-    float speedMin() const { return m_controller.cameraSpeedMin(); }
-    float speedMax() const { return m_controller.cameraSpeedMax(); }
-    float orbitDistanceMin() const { return m_controller.orbitDistanceMin(); }
-    float orbitDistanceMax() const { return m_controller.orbitDistanceMax(); }
-    bool isMovingCamera() const { return m_controller.isMovingCamera(); }
+    QVector3D position() const;
+    float yaw() const;
+    float pitch() const;
+    float speed() const;
+    float mouseSensitivity() const;
+    float orbitDistance() const;
+    float speedMin() const;
+    float speedMax() const;
+    float orbitDistanceMin() const;
+    float orbitDistanceMax() const;
+    bool isMovingCamera() const;
 
     // Setters
     void setSpeed(float s);
@@ -55,7 +55,6 @@ public:
     Q_INVOKABLE void handleMouseMove(QMouseEvent *event, QQuickWindow *window, const QPoint &localPos, const QRect &rect);
     Q_INVOKABLE void handleMouseRelease(QMouseEvent *event, QQuickWindow *window);
     Q_INVOKABLE void handleWheel(QWheelEvent *event);
-    Q_INVOKABLE void update(float dt);
 
 signals:
     void positionChanged();
@@ -67,7 +66,7 @@ signals:
     void isMovingCameraChanged();
 
 private:
-    CameraController m_controller;
+    CameraController *m_sharedController = nullptr;  // Référence partagée
     QVector3D m_lastPosition;
     float m_lastYaw = -90.0f;
     float m_lastPitch = 0.0f;

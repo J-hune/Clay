@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
+import QtQuick.Dialogs
 
 Rectangle {
     width: parent.width
@@ -46,8 +47,14 @@ Rectangle {
                 border.color: "transparent"
                 border.width: 2
 
-                property string currentBrushPath: brushManager.brushCount > 0 ?
-                    brushManager.brushModel.data(brushManager.brushModel.index(brushManager.brushIndex, 0), 259) : ""
+                property string currentBrushPath: {
+                    for (let r = 0; r < brushManager.brushCount; ++r) {
+                        let idx = brushManager.brushModel.index(r, 0)
+                        if (brushManager.brushModel.data(idx, 257) === brushManager.brushIndex)
+                            return brushManager.brushModel.data(idx, 259) || ""
+                    }
+                    return ""
+                }
 
                 Image {
                     id: currentBrushImage
@@ -171,15 +178,17 @@ Rectangle {
                     Rectangle {
                         width: brushGrid.cellSize
                         height: brushGrid.cellSize
-                        color: brushManager.brushIndex === index ? "#2e3440" : "#1e2024"
-                        radius: 10
-                        border.color: brushManager.brushIndex === index ? "#5e81ac" : "#3a3d42"
-                        border.width: brushManager.brushIndex === index ? 2 : 1
 
-                        Behavior on color { ColorAnimation { duration: 150 } }
-
+                        property int realBrushId: brushManager.brushModel.data(brushManager.brushModel.index(index, 0), 257)
                         property string brushFilePath: brushManager.brushModel.data(brushManager.brushModel.index(index, 0), 259)
                         property string brushName: brushManager.brushModel.data(brushManager.brushModel.index(index, 0), 258)
+
+                        color: brushManager.brushIndex === realBrushId ? "#2e3440" : "#1e2024"
+                        radius: 10
+                        border.color: brushManager.brushIndex === realBrushId ? "#5e81ac" : "#3a3d42"
+                        border.width: brushManager.brushIndex === realBrushId ? 2 : 1
+
+                        Behavior on color { ColorAnimation { duration: 150 } }
 
                         Image {
                             id: brushImage
@@ -220,12 +229,95 @@ Rectangle {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
                             hoverEnabled: true
-                            onClicked: brushManager.brushIndex = index
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            onPressAndHold: (mouse) => {
+                                const pos = mapToItem(brushSection.parent, mouse.x, mouse.y);
+                                brushContextMenu.openAt(pos.x, pos.y, parent.realBrushId)
+                            }
+                            onClicked: function(mouse) {
+                                if (mouse.button === Qt.RightButton) {
+                                    const pos = mapToItem(brushSection.parent, mouse.x, mouse.y);
+                                    brushContextMenu.openAt(pos.x, pos.y, parent.realBrushId)
+                                } else {
+                                    brushManager.brushIndex = parent.realBrushId
+                                }
+                            }
                         }
                     }
+                }
+
+                // Bouton ajouter un brush
+                Rectangle {
+                    width: brushGrid.cellSize
+                    height: brushGrid.cellSize
+                    color: "transparent"
+                    radius: 10
+                    border.color: "#3a3d42"
+                    border.width: 1
+
+                    Image {
+                        anchors.centerIn: parent
+                        sourceSize.width: 32
+                        sourceSize.height: 32
+                        source: "../images/plus.svg"
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: addBrushDialog.open()
+                    }
+                }
+
+            }
+        }
+    }
+
+    FileDialog {
+        id: addBrushDialog
+        title: "Choisir une image de pinceau"
+        onAccepted: {
+            // selectedFile peut être un URL; on envoie la chaîne telle quelle au C++
+            if (selectedFile) {
+                brushManager.requestAddBrush(selectedFile)
+            }
+        }
+    }
+
+    BrushContextMenu {
+        id: brushContextMenu
+        brushManager: brushSection.parent.brushManager
+        z: 1000
+    }
+
+    // Overlay pour fermer le menu en cliquant en dehors
+    Loader {
+        id: overlayLoader
+        active: brushContextMenu.isVisible
+        sourceComponent: Item {
+            parent: brushSection.Window.contentItem || brushSection.parent
+            anchors.fill: parent
+            z: 999
+
+            MouseArea {
+                anchors.fill: parent
+                onPressed: (mouse) => {
+                    // On vérifie que le clic n'est pas dans le menu
+                    var contextMenuPos = mapToItem(brushContextMenu, mouse.x, mouse.y)
+
+                    var outsideContextMenu = contextMenuPos.x < 0 || contextMenuPos.x > brushContextMenu.width ||
+                        contextMenuPos.y < 0 || contextMenuPos.y > brushContextMenu.height
+
+                    if (outsideContextMenu) {
+                        brushContextMenu.close()
+                    }
+
+                    mouse.accepted = false
                 }
             }
         }
     }
 }
-

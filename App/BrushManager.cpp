@@ -4,11 +4,9 @@
 #include <algorithm>
 #include <QtOpenGL>
 
-void BrushManager::initialize(QOpenGLFunctions *gl, int maxBrushes, int brushTextureSize) {
+void BrushManager::initialize(int maxBrushes, int brushTextureSize) {
     m_maxBrushes = maxBrushes;
     m_brushTextureSize = brushTextureSize;
-
-    Q_UNUSED(gl);
 
     if (m_texArray == 0) {
         glGenTextures(1, &m_texArray);
@@ -35,11 +33,7 @@ void BrushManager::initialize(QOpenGLFunctions *gl, int maxBrushes, int brushTex
     }
 }
 
-void BrushManager::destroy(QOpenGLFunctions *gl) {
-    if (m_texArray != 0) {
-        gl->glDeleteTextures(1, &m_texArray);
-        m_texArray = 0;
-    }
+void BrushManager::destroy() {
     m_brushes.clear();
 }
 
@@ -47,8 +41,7 @@ bool BrushManager::isValidBrushIndex(const int index) const {
     return index >= 0 && index < static_cast<int>(m_brushes.size()) && m_brushes[static_cast<size_t>(index)].valid;
 }
 
-bool BrushManager::uploadBrush(QOpenGLFunctions *gl, int layerIndex, const QImage &src) {
-    Q_UNUSED(gl);
+bool BrushManager::uploadBrush(int layerIndex, const QImage &src) {
     if (m_texArray == 0) {
         LOG_ERROR() << "Impossible d'uploader un brush, texture array non initialisée";
         return false;
@@ -101,7 +94,7 @@ bool BrushManager::uploadBrush(QOpenGLFunctions *gl, int layerIndex, const QImag
     return true;
 }
 
-void BrushManager::loadFromDirectory(QOpenGLFunctions *gl, const QString &directoryPath) {
+void BrushManager::loadFromDirectory(const QString &directoryPath) {
     if (m_texArray == 0) {
         LOG_WARN() << "BrushManager::loadFromDirectory appelé avant initialize";
         return;
@@ -127,7 +120,7 @@ void BrushManager::loadFromDirectory(QOpenGLFunctions *gl, const QString &direct
             continue;
         }
 
-        if (!uploadBrush(gl, i, img)) {
+        if (!uploadBrush(i, img)) {
             continue;
         }
 
@@ -136,13 +129,14 @@ void BrushManager::loadFromDirectory(QOpenGLFunctions *gl, const QString &direct
         desc.name = fi.baseName();
         desc.filePath = fi.absoluteFilePath();
         desc.valid = true;
+        desc.needsUpload = false;
         m_brushes.push_back(desc);
     }
 
     LOG_INFO() << "Brushes chargés depuis " << directoryPath.toStdString() << ": " << m_brushes.size();
 }
 
-int BrushManager::addBrushFromFile(QOpenGLFunctions *gl, const QString &filePath) {
+int BrushManager::addBrushFromFile(const QString &filePath) {
     if (m_texArray == 0) {
         LOG_WARN() << "BrushManager::addBrushFromFile appelé avant initialize";
         return -1;
@@ -160,18 +154,88 @@ int BrushManager::addBrushFromFile(QOpenGLFunctions *gl, const QString &filePath
     }
 
     const int layerIndex = static_cast<int>(m_brushes.size());
-    if (!uploadBrush(gl, layerIndex, img)) {
-        return -1;
-    }
 
+    // On crée le descripteur mais on ne l'uploade pas tout de suite
+    // L'upload se fera dans le thread de rendu via uploadPendingBrushes()
     BrushDescriptor desc;
     desc.id = layerIndex;
     desc.name = QFileInfo(filePath).baseName();
     desc.filePath = filePath;
     desc.valid = true;
+    desc.needsUpload = true;  // Marquer pour upload différé
     m_brushes.push_back(desc);
 
+    LOG_INFO() << "Brush ajouté (en attente d'upload GPU): " << filePath.toStdString();
     return layerIndex;
+}
+
+int BrushManager::addBrushFromExternalFile(const QString &sourcePath) {
+    if (sourcePath.isEmpty()) return -1;
+
+    const QString storage = m_storageDir;
+    if (storage.isEmpty()) {
+        LOG_WARN() << "Le dossier de stockage des brushes n'est pas défini.";
+        return -1;
+    }
+
+    QDir dir(storage);
+    if (!dir.exists()) {
+        if (!dir.mkpath(storage)) {
+            LOG_WARN() << "Impossible de créer le dossier de stockage des brushes: " << storage.toStdString();
+            return -1;
+        }
+    }
+
+    QString source = sourcePath;
+    if (source.startsWith("file://")) source = QUrl(source).toLocalFile();
+    if (!QFile::exists(source)) {
+        LOG_WARN() << "Fichier source de brush introuvable: " << source.toStdString();
+        return -1;
+    }
+
+    // Compute a destination path avoiding collisions
+    const QString baseName = QFileInfo(source).fileName();
+    QString destPath = dir.filePath(baseName);
+    int suffix = 1;
+    while (QFile::exists(destPath)) {
+        const QString base = QFileInfo(baseName).completeBaseName();
+        const QString suf = QFileInfo(baseName).suffix();
+        destPath = dir.filePath(base + QStringLiteral("_%1.").arg(suffix) + suf);
+        ++suffix;
+    }
+
+    if (!QFile::copy(source, destPath)) {
+        LOG_WARN() << "Échec de la copie du brush dans le dossier de stockage: " << destPath.toStdString();
+        return -1;
+    }
+
+    int idx = addBrushFromFile(destPath);
+    if (idx < 0) {
+        // Si l'upload a raté, on supprime le fichier copié
+        QFile::remove(destPath);
+        return -1;
+    }
+
+    return idx;
+}
+
+bool BrushManager::removeBrushAndFile(const int brushIndex) {
+    if (!isValidBrushIndex(brushIndex)) return false;
+
+    const QString path = m_brushes[static_cast<size_t>(brushIndex)].filePath;
+
+    // On invalide le descripteur en premierr
+    m_brushes[static_cast<size_t>(brushIndex)].valid = false;
+
+    bool removed = false;
+    if (!path.isEmpty() && QFile::exists(path)) {
+        removed = QFile::remove(path);
+        if (!removed) {
+            LOG_WARN() << "Échec de la suppression du fichier de brush: " << path.toStdString();
+        }
+    }
+
+    return removed;
 }
 
 void BrushManager::enqueueStroke(const QVector3D &worldPos) {
@@ -187,23 +251,26 @@ void BrushManager::enqueueStroke(const QVector3D &worldPos) {
     m_pendingStrokes.push_back(s);
 }
 
-void BrushManager::enqueueStroke(const PendingStroke &stroke) {
-    m_pendingStrokes.push_back(stroke);
-}
-
 void BrushManager::removeBrush(const int brushIndex) {
     if (!isValidBrushIndex(brushIndex)) return;
     m_brushes[static_cast<size_t>(brushIndex)].valid = false;
     // On laisse les données GPU en place pour éviter de recaler tout l'array.
 }
 
-void BrushManager::copyBrushesFrom(const BrushManager &other) {
-    // Copie les descripteurs de brushes (mais pas les textures GPU)
-    m_brushes = other.m_brushes;
-    m_maxBrushes = other.m_maxBrushes;
-    m_brushTextureSize = other.m_brushTextureSize;
-    m_texArray = other.m_texArray; // Partage la même texture array
-
-    LOG_INFO() << "BrushManager synchronized: " << m_brushes.size() << " brushes copied";
+void BrushManager::uploadPendingBrushes() {
+    for (auto &brush : m_brushes) {
+        if (brush.needsUpload && brush.valid) {
+            const QImage img(brush.filePath);
+            if (!img.isNull()) {
+                if (uploadBrush(brush.id, img)) {
+                    brush.needsUpload = false;
+                    LOG_INFO() << "Brush uploadé sur GPU: " << brush.filePath.toStdString();
+                } else {
+                    LOG_WARN() << "Échec de l'upload GPU pour: " << brush.filePath.toStdString();
+                }
+            } else {
+                LOG_WARN() << "Impossible de charger l'image pour upload: " << brush.filePath.toStdString();
+            }
+        }
+    }
 }
-
