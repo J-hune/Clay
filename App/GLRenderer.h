@@ -18,7 +18,8 @@ enum class RedrawReason {
     TerrainChanged  = 1 << 0,
     GridChanged     = 1 << 1,
     CameraMoved     = 1 << 2,
-    RaycastChanged  = 1 << 3
+    RaycastChanged  = 1 << 3,
+    BrushChanged    = 1 << 4
 };
 
 inline RedrawReason operator|(RedrawReason a, RedrawReason b) {
@@ -44,6 +45,7 @@ private:
     void syncViewportState();
     void syncTerrain();
     void syncInteractionState();
+    void syncBrush();
 
     // Render helpers
     float computeDeltaTime();
