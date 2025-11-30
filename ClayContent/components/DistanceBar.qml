@@ -1,16 +1,14 @@
 import QtQuick
 
 // Barre distance orbit (min=plein, max=vide)
-Rectangle {
+Item {
     id: distanceBar
     visible: false
     width: 12
-    radius: 4
-    color: "#222"
-    border.width: 1
-    border.color: "#444"
 
     required property var cameraController
+    property var otherBar: null
+    property alias hideTimer: hideTimer
 
     property real value: cameraController.orbitDistance
     property real minVal: cameraController.orbitDistanceMin
@@ -20,27 +18,45 @@ Rectangle {
     function ratio() {
         var span = maxVal - minVal;
         if (span <= 0) return 1;
-        return 1 - (value - minVal) / span;
+        var r = 1 - (value - minVal) / span;
+        return Math.max(0, Math.min(1, r));
     }
 
     function showTemp() {
+        if (otherBar && otherBar.hideTimer) {
+            otherBar.visible = false;
+            otherBar.hideTimer.stop();
+        }
         visible = true;
         hideTimer.restart();
     }
 
     Rectangle {
-        id: distanceFill
+        id: barBackground
         anchors.left: parent.left
         anchors.right: parent.right
+        anchors.top: parent.top
         anchors.bottom: parent.bottom
-        height: parent.height * distanceBar.ratio()
-        radius: parent.radius
-        color: "#BF5934"
+        radius: 4
+        color: "#222"
+        border.width: 1
+        border.color: "#444"
+        clip: true
+
+        Rectangle {
+            id: distanceFill
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: parent.height * distanceBar.ratio()
+            radius: parent.radius
+            color: "#BF5934"
+        }
     }
 
     Image {
         id: distanceImage
-        anchors.top: parent.bottom
+        anchors.top: barBackground.bottom
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.topMargin: 6
         width: 15
@@ -58,6 +74,6 @@ Rectangle {
         onTriggered: distanceBar.visible = false
     }
 
-    onValueChanged: distanceFill.height = height * ratio()
+    onValueChanged: distanceFill.height = barBackground.height * ratio()
 }
 

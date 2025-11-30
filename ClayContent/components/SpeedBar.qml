@@ -1,16 +1,14 @@
 import QtQuick
 
 // Barre vitesse FPS (min=plein, max=vide)
-Rectangle {
+Item {
     id: speedBar
     visible: false
     width: 12
-    radius: 4
-    color: "#222"
-    border.width: 1
-    border.color: "#444"
 
     required property var cameraController
+    property var otherBar: null
+    property alias hideTimer: hideTimer
 
     property real value: cameraController.speed
     property real minVal: cameraController.speedMin
@@ -21,27 +19,45 @@ Rectangle {
         // min -> 1, max -> 0
         var span = maxVal - minVal;
         if (span <= 0) return 1;
-        return (value - minVal) / span;
+        var r = (value - minVal) / span;
+        return Math.max(0, Math.min(1, r));
     }
 
     function showTemp() {
+        if (otherBar && otherBar.hideTimer) {
+            otherBar.visible = false;
+            otherBar.hideTimer.stop();
+        }
         visible = true;
         hideTimer.restart();
     }
 
     Rectangle {
-        id: speedFill
+        id: barBackground
         anchors.left: parent.left
         anchors.right: parent.right
+        anchors.top: parent.top
         anchors.bottom: parent.bottom
-        height: parent.height * speedBar.ratio()
-        radius: parent.radius
-        color: "#866ab6"
+        radius: 4
+        color: "#222"
+        border.width: 1
+        border.color: "#444"
+        clip: true
+
+        Rectangle {
+            id: speedFill
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: parent.height * speedBar.ratio()
+            radius: parent.radius
+            color: "#866ab6"
+        }
     }
 
     Image {
         id: speedImage
-        anchors.top: parent.bottom
+        anchors.top: barBackground.bottom
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.topMargin: 6
         width: 15
@@ -60,6 +76,6 @@ Rectangle {
     }
 
     // Mise à jour continue
-    onValueChanged: speedFill.height = height * ratio()
+    onValueChanged: speedFill.height = barBackground.height * ratio()
 }
 
