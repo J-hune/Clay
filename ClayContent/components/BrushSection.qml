@@ -154,11 +154,47 @@ Rectangle {
             width: parent.width
             spacing: 10
 
-            Text {
-                text: "Galerie (" + brushManager.brushCount + " pinceaux)"
-                color: "#d8dee9"
-                font.pixelSize: 13
-                font.weight: Font.Medium
+            Row {
+                width: parent.width
+                spacing: 10
+
+                Text {
+                    text: "Galerie (" + brushManager.brushCount + " pinceaux)"
+                    color: "#d8dee9"
+                    font.pixelSize: 13
+                    font.weight: Font.Medium
+                }
+
+                // Indicateur de chargement
+                Rectangle {
+                    visible: !brushManager.isLoadingComplete
+                    width: 100
+                    height: 16
+                    color: "#1e2024"
+                    radius: 8
+                    border.color: "#3a3d42"
+                    border.width: 1
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Rectangle {
+                        width: parent.width * brushManager.loadingProgress
+                        height: parent.height
+                        color: "#5e81ac"
+                        radius: 8
+
+                        Behavior on width {
+                            NumberAnimation { duration: 150 }
+                        }
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: Math.round(brushManager.loadingProgress * 100) + "%"
+                        color: "#e5e9f0"
+                        font.pixelSize: 10
+                        font.weight: Font.Medium
+                    }
+                }
             }
 
             // Grille de brushes

@@ -13,7 +13,7 @@
 int main(int argc, char *argv[]) {
     set_qt_environment();
     QApplication app(argc, argv);
-    Log::setLevel(Log::Level::Debug);
+    Log::setLevel(Log::Level::Info);
 
     // Chargement des fonts Open Sans
     int fontIdRegular = QFontDatabase::addApplicationFont(":/qt/qml/ClayContent/fonts/OpenSans-Regular.ttf");
