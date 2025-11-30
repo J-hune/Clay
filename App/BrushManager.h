@@ -27,7 +27,7 @@ public:
     BrushManager() = default;
     ~BrushManager() = default;
 
-    void initialize(int maxBrushes = 32, int brushTextureSize = 128);
+    void initialize(int maxBrushes = 64, int brushTextureSize = 1024);
     void destroy();
 
     // Chargement initial depuis un dossier ("brushes" par défaut)

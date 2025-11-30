@@ -20,9 +20,9 @@ Column {
 
         Repeater {
             model: [
-                {op: 0, label: "Raise", tooltip: "Élever le terrain"},
-                {op: 1, label: "Lower", tooltip: "Abaisser le terrain"},
-                {op: 2, label: "Smooth", tooltip: "Lisser le terrain"},
+                {op: 0, label: "Raise"},
+                {op: 1, label: "Lower"},
+                {op: 2, label: "Smooth"},
             ]
 
             Button {
@@ -33,10 +33,8 @@ Column {
                 property bool isActive: brushManager.brushOperation === modelData.op
 
                 background: Rectangle {
-                    color: opButton.isActive ? "#bf5934" : (opButton.hovered ? "#33353a" : "#2a2d32")
-                    border.color: opButton.isActive ? "#d96b44" : "#3f4248"
-                    border.width: 1
-                    radius: 4
+                    color: opButton.isActive ? "#DBB1BC" : (opButton.hovered ? "#3A3D42" : "#1e2024")
+                    radius: 6
 
                     Behavior on color {
                         ColorAnimation {
@@ -47,16 +45,12 @@ Column {
 
                 contentItem: Text {
                     text: modelData.label
-                    color: opButton.isActive ? "#ffffff" : "#d3d6da"
-                    font.pixelSize: 11
+                    color: opButton.isActive ? "#000000" : "#d3d6da"
+                    font.pixelSize: 13
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                     elide: Text.ElideRight
                 }
-
-                ToolTip.visible: hovered
-                ToolTip.text: modelData.tooltip
-                ToolTip.delay: 500
 
                 onClicked: {
                     brushManager.brushOperation = modelData.op
