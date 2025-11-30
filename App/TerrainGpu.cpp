@@ -39,7 +39,6 @@ uniform float uHitValid; // 1.0 si hit valide, 0.0 sinon
 uniform sampler2DArray uBrushArray;
 uniform int uBrushIndex;
 uniform float uBrushSize;
-uniform float uBrushStrength;
 
 in float vHeight;
 in vec2 vUV;
@@ -98,12 +97,7 @@ void main() {
             local.y >= 0.0 && local.y <= 1.0) {
 
             float texVal = texture(uBrushArray, vec3(local, float(uBrushIndex))).r;
-
-            // falloff optionnel (non radial)
-            float mask = 1.0; // garde la texture brute
-            // ou un falloff carré : mask = min(1.0 - abs(delta.x)/uBrushSize, 1.0 - abs(delta.y)/uBrushSize);
-
-            lit = mix(lit, vec3(0.627, 0.796, 0.835), texVal * mask * uBrushStrength);
+            lit = mix(lit, vec3(0.627, 0.796, 0.835), texVal);
         }
     }
 
@@ -317,7 +311,6 @@ void TerrainGpu::draw(QOpenGLFunctions *gl, const QMatrix4x4 &proj, const QMatri
     // Uniforms de brush
     m_program->setUniformValue("uBrushIndex", m_brushIndex);
     m_program->setUniformValue("uBrushSize", m_brushSize);
-    m_program->setUniformValue("uBrushStrength", m_brushStrength);
 
     gl->glActiveTexture(GL_TEXTURE0);
     gl->glBindTexture(GL_TEXTURE_2D, m_tex);

@@ -105,7 +105,7 @@ Rectangle {
                     id: brushSizeSlider
                     width: parent.width
                     from: 0.1
-                    to: 10
+                    to: 100
                     stepSize: 0.1
                     value: brushManager.brushSize
                     label: "Taille"
@@ -119,7 +119,7 @@ Rectangle {
                     id: brushStrengthSlider
                     width: parent.width
                     from: 0.0
-                    to: 5.0
+                    to: 10.0
                     stepSize: 0.05
                     value: brushManager.brushStrength
                     label: "Intensité"
