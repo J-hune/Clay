@@ -229,7 +229,7 @@ void GLRenderer::drawScene(const QMatrix4x4 &proj, const QMatrix4x4 &view) {
 
     if (m_terrainReady) {
         m_terrainGpu.setBrushTextureArray(m_brushManager.brushTextureArrayId());
-        m_terrainGpu.draw(this, proj, view);
+        m_terrainGpu.draw(this, proj, view, m_cameraController.camera().frontVector());
     }
 }
 
@@ -301,7 +301,8 @@ void GLRenderer::applyPendingStrokes() {
             stroke.brushIndex,
             -50.0f, 50.0f,
             -50.0f, 50.0f,
-            terrainQml->heightScale()
+            terrainQml->heightScale(),
+            m_cameraController.camera().frontVector()
         );
     }
 

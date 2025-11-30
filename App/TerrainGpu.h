@@ -12,7 +12,7 @@ public:
     void initialize(QOpenGLFunctions *gl);
     void rebuild(QOpenGLFunctions *gl, const QImage &heightImage, float heightScale);
     void rebuildFlat(QOpenGLFunctions *gl, float heightScale);
-    void draw(QOpenGLFunctions *gl, const QMatrix4x4 &proj, const QMatrix4x4 &view);
+    void draw(QOpenGLFunctions *gl, const QMatrix4x4 &proj, const QMatrix4x4 &view, const QVector3D &cameraForward);
 
     void setGridResolution(int rx, int rz) { m_gridResX = rx; m_gridResZ = rz; m_dirtyMesh = true; }
     void setTextureResolution(int r) { m_texRes = r; m_dirtyTexture = true; }

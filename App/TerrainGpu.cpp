@@ -34,6 +34,7 @@ uniform float uHeightScale;
 uniform float uTexSize; // résolution de la heightmap
 uniform vec3 uHitPos; // Position du hit du raycast
 uniform float uHitValid; // 1.0 si hit valide, 0.0 sinon
+uniform vec3 uCameraForward; // direction avant de la caméra
 
 // Brush preview
 uniform sampler2DArray uBrushArray;
@@ -88,9 +89,20 @@ void main() {
 
     // Aperçu du brush : on utilise la texture du brush
     if (uHitValid > 0.5 && uBrushSize > 0.0 && uBrushIndex >= 0) {
-        // Coordonnées locales [0,1] dans l’espace du brush (plan XZ)
+        // Coordonnées locales [0,1] dans l'espace du brush (plan XZ)
         vec2 delta = vWorldPos.xz - uHitPos.xz;
-        vec2 local = delta / (uBrushSize * 2.0) + 0.5; // map [-uBrushSize, uBrushSize] → [0,1]
+
+        // On calcule l'angle de rotation basé sur la direction de la caméra (yaw)
+        vec2 cameraDir2D = normalize(uCameraForward.xz);
+        float angle = atan(cameraDir2D.y, cameraDir2D.x);
+
+        // Matrice de rotation 2D
+        float c = cos(angle);
+        float s = sin(angle);
+        mat2 rotation = mat2(c, -s, s, c);
+
+        vec2 rotatedDelta = rotation * delta;
+        vec2 local = rotatedDelta / (uBrushSize * 2.0) + 0.5;
 
         // si on est dans le carré
         if (local.x >= 0.0 && local.x <= 1.0 &&
@@ -295,7 +307,7 @@ void TerrainGpu::rebuildFlat(QOpenGLFunctions *gl, float heightScale) {
     LOG_INFO() << "Terrain plat reconstruit, scale=" << m_heightScale;
 }
 
-void TerrainGpu::draw(QOpenGLFunctions *gl, const QMatrix4x4 &proj, const QMatrix4x4 &view) {
+void TerrainGpu::draw(QOpenGLFunctions *gl, const QMatrix4x4 &proj, const QMatrix4x4 &view, const QVector3D &cameraForward) {
     if (!m_program || !m_program->isLinked() || !m_haveTextureData) return;
     ensureMesh(gl);
 
@@ -307,6 +319,7 @@ void TerrainGpu::draw(QOpenGLFunctions *gl, const QMatrix4x4 &proj, const QMatri
 
     m_program->setUniformValue("uHitPos", m_hitPos);
     m_program->setUniformValue("uHitValid", m_hitValid ? 1.0f : 0.0f);
+    m_program->setUniformValue("uCameraForward", cameraForward);
 
     // Uniforms de brush
     m_program->setUniformValue("uBrushIndex", m_brushIndex);
