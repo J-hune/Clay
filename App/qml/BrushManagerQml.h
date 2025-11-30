@@ -18,6 +18,8 @@ class BrushManagerQml : public QObject {
     Q_PROPERTY(int brushOperation READ brushOperation WRITE setBrushOperation NOTIFY brushOperationChanged)
     Q_PROPERTY(int brushCount READ brushCount NOTIFY brushCountChanged)
     Q_PROPERTY(BrushListModel* brushModel READ brushModel NOTIFY brushModelChanged)
+    Q_PROPERTY(bool isLoadingComplete READ isLoadingComplete NOTIFY loadingProgressChanged)
+    Q_PROPERTY(float loadingProgress READ loadingProgress NOTIFY loadingProgressChanged)
 
 public:
     explicit BrushManagerQml(QObject *parent = nullptr);
@@ -33,6 +35,8 @@ public:
     int brushOperation() const;
     int brushCount() const { return m_brushModel.rowCount(); }
     BrushListModel* brushModel() { return &m_brushModel; }
+    bool isLoadingComplete() const { return m_sharedManager ? m_sharedManager->isLoadingComplete() : true; }
+    float loadingProgress() const { return m_sharedManager ? m_sharedManager->loadingProgress() : 1.0f; }
 
     // Setters
     void setBrushIndex(int index);
@@ -58,6 +62,7 @@ signals:
     void brushOperationChanged();
     void brushCountChanged();
     void brushModelChanged();
+    void loadingProgressChanged();
 
 private:
     BrushManager *m_sharedManager = nullptr;

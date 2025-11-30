@@ -67,7 +67,16 @@ void GLRenderer::syncViewportState() {
     m_drawAxes = m_viewport->drawAxes();
 
     // Upload des brushes en attente (dans le thread de rendu)
+    const int prevPending = m_brushManager.pendingUploadsCount();
     m_brushManager.uploadPendingBrushes();
+    const int newPending = m_brushManager.pendingUploadsCount();
+
+    // Notifier l'UI si la progression a changé
+    if (prevPending != newPending) {
+        if (auto* brushQml = m_viewport->brushManagerTyped()) {
+            emit brushQml->loadingProgressChanged();
+        }
+    }
 
     // Détection des changements
     const int currentGridRes = m_viewport->grid().resolution();

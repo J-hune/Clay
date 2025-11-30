@@ -77,22 +77,28 @@ public:
     // Upload des brushes en attente (appelé dans le thread de rendu)
     void uploadPendingBrushes();
 
+    // Statut du chargement asynchrone
+    int pendingUploadsCount() const;
+    bool isLoadingComplete() const;
+    float loadingProgress() const; // Retourne 0.0 à 1.0
+
 private:
     bool uploadBrush(int layerIndex, const QImage &img);
 
     GLuint m_texArray = 0;
     int m_maxBrushes = 0;
     int m_brushTextureSize = 0;
-    std::vector<BrushDescriptor> m_brushes;
 
     // État courant du brush
+    std::vector<BrushDescriptor> m_brushes;
+    std::vector<float> m_tempUploadBuffer;
+
     int m_currentBrushIndex = 0;
     float m_brushSize = 2.0f;
     float m_brushStrength = 1.0f;
     BrushOpType m_operation = BrushOpType::Raise;
     bool m_dirty = false;
 
-    // File de strokes à appliquer
     std::vector<PendingStroke> m_pendingStrokes;
 
     // Dossier de stockage des brushes

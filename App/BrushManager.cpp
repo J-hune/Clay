@@ -46,51 +46,39 @@ bool BrushManager::uploadBrush(int layerIndex, const QImage &src) {
         LOG_ERROR() << "Impossible d'uploader un brush, texture array non initialisée";
         return false;
     }
+
     if (layerIndex < 0 || layerIndex >= m_maxBrushes) {
         LOG_WARN() << "Indice de layer brush invalide: " << layerIndex;
         return false;
     }
 
-    // Mise au format et à la taille attendus
-    QImage img = src;
+    const QImage img = src.size() == QSize(m_brushTextureSize, m_brushTextureSize)
+                           ? src
+                           : src.scaled(m_brushTextureSize, m_brushTextureSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+
     if (img.isNull()) {
         LOG_WARN() << "Image de brush invalide";
         return false;
     }
 
-    if (img.width() != m_brushTextureSize || img.height() != m_brushTextureSize) {
-        img = img.scaled(m_brushTextureSize, m_brushTextureSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-    }
+    QImage grayImg = img.convertToFormat(QImage::Format_Grayscale16);
 
-    // Convertit en float grayscale
-    std::vector<float> data;
-    data.resize(static_cast<size_t>(m_brushTextureSize) * static_cast<size_t>(m_brushTextureSize));
-    for (int y = 0; y < m_brushTextureSize; ++y) {
-        for (int x = 0; x < m_brushTextureSize; ++x) {
-            const QRgb p = img.pixel(x, y);
-            const int r = qRed(p);
-            const int g = qGreen(p);
-            const int b = qBlue(p);
-            const float gray = (r * 0.299f + g * 0.587f + b * 0.114f) / 255.f;
-            data[static_cast<size_t>(y) * static_cast<size_t>(m_brushTextureSize) + static_cast<size_t>(x)] = gray;
-        }
-    }
+    const int n = m_brushTextureSize * m_brushTextureSize;
+    if (m_tempUploadBuffer.size() < n) m_tempUploadBuffer.resize(n);
+
+    const ushort *srcPtr = reinterpret_cast<const ushort *>(grayImg.constBits());
+    std::transform(srcPtr, srcPtr + n, m_tempUploadBuffer.begin(), [](ushort v) { return v / 65535.0f; });
 
     glBindTexture(GL_TEXTURE_2D_ARRAY, m_texArray);
-    glTexSubImage3D(GL_TEXTURE_2D_ARRAY,
-                    0,
-                    0,
-                    0,
-                    layerIndex,
-                    m_brushTextureSize,
-                    m_brushTextureSize,
-                    1,
-                    GL_RED,
-                    GL_FLOAT,
-                    data.data());
+    glTexSubImage3D(
+        GL_TEXTURE_2D_ARRAY,
+        0, 0, 0, layerIndex,
+        m_brushTextureSize, m_brushTextureSize, 1,
+        GL_RED, GL_FLOAT, m_tempUploadBuffer.data()
+    );
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 
-    LOG_INFO() << "Brush uploadé dans layer=" << layerIndex;
+    LOG_DEBUG() << "Brush uploadé dans layer=" << layerIndex;
     return true;
 }
 
@@ -109,31 +97,58 @@ void BrushManager::loadFromDirectory(const QString &directoryPath) {
     const QStringList filters{QStringLiteral("*.png"), QStringLiteral("*.jpg"), QStringLiteral("*.jpeg"), QStringLiteral("*.bmp")};
     const QFileInfoList files = dir.entryInfoList(filters, QDir::Files | QDir::Readable, QDir::Name);
 
+    if (files.isEmpty()) {
+        LOG_WARN() << "Aucun brush trouvé dans: " << directoryPath.toStdString();
+        return;
+    }
+
     m_brushes.clear();
+    m_brushes.reserve(static_cast<size_t>(std::min(m_maxBrushes, static_cast<int>(files.size()))));
 
     const int maxToLoad = std::min(m_maxBrushes, static_cast<int>(files.size()));
-    for (int i = 0; i < maxToLoad; ++i) {
-        const QFileInfo &fi = files.at(i);
-        const QImage img(fi.absoluteFilePath());
-        if (img.isNull()) {
-            LOG_WARN() << "Échec chargement brush: " << fi.absoluteFilePath().toStdString();
-            continue;
+
+    // Charger le premier brush de manière synchrone pour avoir un brush utilisable immédiatement
+    if (maxToLoad > 0) {
+        const QFileInfo &firstFile = files.at(0);
+        const QImage firstImage(firstFile.absoluteFilePath());
+
+        BrushDescriptor firstDesc;
+        firstDesc.id = 0;
+        firstDesc.name = firstFile.baseName();
+        firstDesc.filePath = firstFile.absoluteFilePath();
+        firstDesc.valid = true;
+
+        if (!firstImage.isNull() && uploadBrush(0, firstImage)) {
+            firstDesc.needsUpload = false;
+            LOG_INFO() << "Premier brush chargé (synchrone): " << firstFile.fileName().toStdString();
+        } else {
+            firstDesc.needsUpload = true;
+            LOG_WARN() << "Échec du chargement synchrone du premier brush, sera réessayé en asynchrone";
         }
 
-        if (!uploadBrush(i, img)) {
-            continue;
-        }
+        m_brushes.push_back(firstDesc);
+    }
+
+    // Créer les descripteurs pour les brushes restants (chargement asynchrone)
+    for (int i = 1; i < maxToLoad; ++i) {
+        const QFileInfo &fi = files.at(i);
 
         BrushDescriptor desc;
         desc.id = i;
         desc.name = fi.baseName();
         desc.filePath = fi.absoluteFilePath();
         desc.valid = true;
-        desc.needsUpload = false;
+        desc.needsUpload = true;  // Upload asynchrone
         m_brushes.push_back(desc);
     }
 
-    LOG_INFO() << "Brushes chargés depuis " << directoryPath.toStdString() << ": " << m_brushes.size();
+    // Marquer comme dirty pour forcer le rendu pendant le chargement asynchrone
+    if (pendingUploadsCount() > 0) {
+        m_dirty = true;
+    }
+
+    LOG_INFO() << "Brushes enregistrés: " << m_brushes.size()
+               << " (1 chargé, " << (maxToLoad - 1) << " en attente)";
 }
 
 int BrushManager::addBrushFromFile(const QString &filePath) {
@@ -258,21 +273,37 @@ void BrushManager::removeBrush(const int brushIndex) {
 }
 
 void BrushManager::uploadPendingBrushes() {
-    for (auto &brush : m_brushes) {
-        if (brush.needsUpload && brush.valid) {
-            const QImage img(brush.filePath);
-            if (!img.isNull()) {
-                if (uploadBrush(brush.id, img)) {
-                    brush.needsUpload = false;
-                    LOG_INFO() << "Brush uploadé sur GPU: " << brush.filePath.toStdString();
-                } else {
-                    LOG_WARN() << "Échec de l'upload GPU pour: " << brush.filePath.toStdString();
-                }
-            } else {
-                LOG_WARN() << "Impossible de charger l'image pour upload: " << brush.filePath.toStdString();
-            }
+    // Configuration: nombre de brushes à charger par frame pour équilibrer performance/fluidité
+    constexpr int MAX_UPLOADS_PER_FRAME = 1;
+    int uploadedThisFrame = 0;
+    bool hasPendingBrushes = false;
+
+    for (auto &brush: m_brushes | std::views::filter([](auto &b) { return b.valid && b.needsUpload; })) {
+        hasPendingBrushes = true;
+
+        if (uploadedThisFrame >= MAX_UPLOADS_PER_FRAME) break;
+
+        QImage img(brush.filePath);
+        if (img.isNull()) {
+            LOG_WARN() << "Impossible de charger l'image: " << brush.filePath.toStdString();
+            brush.needsUpload = false;
+            brush.valid = false;
+            continue;
+        }
+
+        if (uploadBrush(brush.id, img)) {
+            brush.needsUpload = false;
+            uploadedThisFrame++;
+            LOG_DEBUG() << "Brush " << (brush.id + 1) << "/" << m_brushes.size()<< " chargé: " << brush.name.toStdString();
+        } else {
+            LOG_ERROR() << "Échec de l'upload GPU pour: " << brush.filePath.toStdString();
+            brush.needsUpload = false;
+            brush.valid = false;
         }
     }
+
+    // Maintenir le dirty flag tant que le chargement n'est pas terminé
+    if (hasPendingBrushes) m_dirty = true;
 }
 
 void BrushManager::setCurrentBrushIndex(int index) {
@@ -301,5 +332,36 @@ void BrushManager::setOperation(BrushOpType op) {
         m_operation = op;
         m_dirty = true;
     }
+}
+
+int BrushManager::pendingUploadsCount() const {
+    int count = 0;
+    for (const auto &brush : m_brushes) {
+        if (brush.valid && brush.needsUpload) {
+            count++;
+        }
+    }
+    return count;
+}
+
+bool BrushManager::isLoadingComplete() const {
+    return pendingUploadsCount() == 0;
+}
+
+float BrushManager::loadingProgress() const {
+    if (m_brushes.empty()) return 1.0f;
+
+    int total = 0;
+    int loaded = 0;
+    for (const auto &brush : m_brushes) {
+        if (brush.valid) {
+            total++;
+            if (!brush.needsUpload) {
+                loaded++;
+            }
+        }
+    }
+
+    return total > 0 ? static_cast<float>(loaded) / static_cast<float>(total) : 1.0f;
 }
 
