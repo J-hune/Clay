@@ -20,9 +20,9 @@ Column {
 
         Repeater {
             model: [
-                {op: 0, label: "Raise"},
-                {op: 1, label: "Lower"},
-                {op: 2, label: "Smooth"},
+                {op: 0, label: "Raise", icon: "raise.svg"},
+                {op: 1, label: "Lower", icon: "lower.svg"},
+                {op: 2, label: "Smooth", icon: "smooth.svg"}
             ]
 
             Button {
@@ -43,14 +43,10 @@ Column {
                     }
                 }
 
-                contentItem: Text {
-                    text: modelData.label
-                    color: opButton.isActive ? "#000000" : "#d3d6da"
-                    font.pixelSize: 13
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    elide: Text.ElideRight
-                }
+                icon.source: "../images/" + modelData.icon
+                icon.width: Math.min(20, width)
+                icon.height: Math.min(24, height)
+                icon.color: opButton.isActive ? "#2E2B3C" : "#d8dee9"
 
                 onClicked: {
                     brushManager.brushOperation = modelData.op
