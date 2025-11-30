@@ -107,6 +107,7 @@ Rectangle {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             cameraController: cameraController
+            otherBar: distanceBar
         }
 
         // Barre distance orbit
@@ -119,6 +120,7 @@ Rectangle {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             cameraController: cameraController
+            otherBar: speedBar
         }
 
         // Overlay d'information sur la caméra / rendu
