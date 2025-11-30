@@ -18,6 +18,7 @@ uniform int uBrushIndex;
 uniform vec4 uTerrainBounds;
 uniform float uHeightScale;
 uniform int uHeightmapRes;
+uniform vec3 uCameraForward;
 
 vec2 worldToUV(vec2 worldXZ) {
     vec2 terrainMin = uTerrainBounds.xz;
@@ -49,7 +50,17 @@ void main() {
     vec2 brushCenter = uWorldPos.xz;
     vec2 delta = worldXZ - brushCenter;
 
-    vec2 brushUV = (delta / uBrushSize) * 0.5 + 0.5;
+    vec2 cameraDir = normalize(uCameraForward.xz);
+    float angle = atan(cameraDir.y, cameraDir.x);
+
+    // Matrice de rotation 2D
+    float c = cos(angle);
+    float s = sin(angle);
+    mat2 rotation = mat2(c, -s, s, c);
+
+    vec2 rotatedDelta = rotation * delta;
+
+    vec2 brushUV = (rotatedDelta / uBrushSize) * 0.5 + 0.5;
     float brushMask = 0.0;
     if (brushUV.x >= 0.0 && brushUV.x <= 1.0 && brushUV.y >= 0.0 && brushUV.y <= 1.0) {
         brushMask = texture(uBrushArray, vec3(brushUV, float(uBrushIndex))).r;
@@ -126,7 +137,8 @@ void TerrainBrushOp::applyBrush(QOpenGLExtraFunctions *gl,
                                 float terrainMaxX,
                                 float terrainMinZ,
                                 float terrainMaxZ,
-                                float heightScale) {
+                                float heightScale,
+                                const QVector3D &cameraForward) {
     if (!m_computeProgram) {
         ensureProgram(gl);
         if (!m_computeProgram) {
@@ -145,6 +157,7 @@ void TerrainBrushOp::applyBrush(QOpenGLExtraFunctions *gl,
     m_computeProgram->setUniformValue("uTerrainBounds", QVector4D(terrainMinX, terrainMaxX, terrainMinZ, terrainMaxZ));
     m_computeProgram->setUniformValue("uHeightScale", heightScale);
     m_computeProgram->setUniformValue("uHeightmapRes", heightmapResolution);
+    m_computeProgram->setUniformValue("uCameraForward", cameraForward);
 
     gl->glBindImageTexture(0, heightmapTexture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
 

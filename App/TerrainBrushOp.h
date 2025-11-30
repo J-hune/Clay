@@ -29,7 +29,8 @@ public:
                    float terrainMaxX,
                    float terrainMinZ,
                    float terrainMaxZ,
-                   float heightScale);
+                   float heightScale,
+                   const QVector3D &cameraForward);
 
 private:
     void ensureProgram(QOpenGLExtraFunctions *gl);
