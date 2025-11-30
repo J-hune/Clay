@@ -30,6 +30,9 @@ public:
     }
     void setBrushTextureArray(GLuint texArray) { m_brushArray = texArray; }
 
+    // Export de la heightmap depuis la texture GPU
+    QImage exportHeightmap16(QOpenGLFunctions *gl) const;
+
 private:
     void ensureMesh(QOpenGLFunctions *gl);
     void ensureProgram(const QOpenGLFunctions *gl);

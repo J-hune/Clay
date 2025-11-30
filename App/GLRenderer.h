@@ -40,6 +40,9 @@ public:
     void render() override;
     QOpenGLFramebufferObject *createFramebufferObject(const QSize &size) override;
 
+    // Export de heightmap
+    bool exportHeightmap(const QString &filePath);
+
 private:
     // Synchronize helpers
     void syncViewportState();

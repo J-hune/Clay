@@ -54,6 +54,12 @@ void GLRenderer::synchronize(QQuickFramebufferObject *item) {
     syncTerrain();
     syncBrush();
     syncInteractionState();
+
+    // Traiter la demande d'export si présente
+    if (m_viewport->m_exportRequest.pending) {
+        exportHeightmap(m_viewport->m_exportRequest.filePath);
+        m_viewport->m_exportRequest.pending = false;
+    }
 }
 
 void GLRenderer::syncViewportState() {
@@ -349,3 +355,35 @@ QOpenGLFramebufferObject *GLRenderer::createFramebufferObject(const QSize &size)
     LOG_INFO() << "FBO créé: " << size.width() << "x" << size.height();
     return fbo;
 }
+
+bool GLRenderer::exportHeightmap(const QString &filePath) {
+    if (!m_terrainReady) {
+        LOG_WARN() << "Impossible d'exporter: terrain non prêt";
+        return false;
+    }
+
+    LOG_INFO() << "Export heightmap vers:" << filePath.toStdString();
+
+    // Utiliser la méthode GPU pour exporter
+    QImage heightmap = m_terrainGpu.exportHeightmap16(this);
+    if (heightmap.isNull()) {
+        LOG_ERROR() << "Échec de l'export depuis le GPU";
+        return false;
+    }
+
+    // Convertir le chemin QML (peut être file://) en chemin local
+    QString localPath = filePath;
+    if (localPath.startsWith("file://")) {
+        localPath = localPath.mid(7);
+    }
+
+    const bool success = heightmap.save(localPath, "PNG");
+    if (success) {
+        LOG_INFO() << "Heightmap exportée avec succès:" << localPath.toStdString();
+    } else {
+        LOG_ERROR() << "Échec de la sauvegarde de la heightmap:" << localPath.toStdString();
+    }
+
+    return success;
+}
+

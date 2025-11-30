@@ -352,3 +352,51 @@ void TerrainGpu::draw(QOpenGLFunctions *gl, const QMatrix4x4 &proj, const QMatri
     }
     m_program->release();
 }
+
+QImage TerrainGpu::exportHeightmap16(QOpenGLFunctions *gl) const {
+    if (!gl || !m_tex) {
+        LOG_WARN() << "exportHeightmap16: paramètres invalides";
+        return QImage();
+    }
+
+    const int texSize = m_texRes;
+    const size_t dataSize = static_cast<size_t>(texSize) * static_cast<size_t>(texSize);
+    std::vector<float> data(dataSize);
+
+    // On crée un FBO temporaire pour lire la texture
+    GLuint fbo = 0;
+    gl->glGenFramebuffers(1, &fbo);
+    gl->glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    gl->glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_tex, 0);
+
+    if (gl->glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        LOG_ERROR() << "FBO incomplet pour lecture de texture";
+        gl->glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        gl->glDeleteFramebuffers(1, &fbo);
+        return QImage();
+    }
+
+    gl->glReadPixels(0, 0, texSize, texSize, GL_RED, GL_FLOAT, data.data());
+    gl->glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    gl->glDeleteFramebuffers(1, &fbo);
+
+    LOG_INFO() << "Texture heightmap lue depuis GPU: " << texSize << "x" << texSize;
+
+    // Créer l'image en 16-bit grayscale
+    QImage img(texSize, texSize, QImage::Format_Grayscale16);
+    if (img.isNull()) {
+        LOG_ERROR() << "Échec création QImage Grayscale16";
+        return QImage();
+    }
+
+    for (int y = 0; y < texSize; ++y) {
+        quint16 *scanline = reinterpret_cast<quint16*>(img.scanLine(y));
+        for (int x = 0; x < texSize; ++x) {
+            const float height = data[y * texSize + x];
+            scanline[x] = static_cast<quint16>(height * 65535.0f);
+        }
+    }
+
+    LOG_INFO() << "Heightmap 16-bit exportée: " << texSize << "x" << texSize;
+    return img;
+}

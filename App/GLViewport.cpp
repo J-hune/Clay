@@ -237,3 +237,9 @@ void GLViewport::applyBrushAtCurrentPosition() {
 QQuickFramebufferObject::Renderer *GLViewport::createRenderer() const {
     return new GLRenderer(const_cast<GLViewport *>(this));
 }
+
+void GLViewport::exportHeightmap(const QString &filePath) {
+    // On stocke la demande d'export qui sera traitée dans le thread de rendu
+    m_exportRequest = {filePath, true};
+    update();
+}
