@@ -177,6 +177,21 @@ void GLViewport::mouseReleaseEvent(QMouseEvent *event) {
 }
 
 void GLViewport::wheelEvent(QWheelEvent *event) {
+    // Alt + Molette : changer la taille du pinceau
+    if (event->modifiers() & Qt::AltModifier) {
+        if (auto *brush = brushManagerTyped()) {
+            const QPoint numDegrees = event->angleDelta() / 8; // 1 "degree" = 1/8 de tour
+            const float delta = numDegrees.x() / 15.f; // 1 cran = 15°
+            const float newSize = qMax(0.5f, qMin(100.0f, brush->brushSize() + delta));
+            brush->setBrushSize(newSize);
+        }
+
+        event->accept();
+        update();
+        return;
+    }
+
+    // Sinon, comportement normal de la caméra
     if (auto *camera = cameraControllerTyped()) {
         camera->handleWheel(event);
     }
@@ -203,9 +218,9 @@ void GLViewport::applyBrushAtCurrentPosition() {
 
     // Vérifier toutes les conditions pour appliquer le brush
     const bool canApplyBrush = m_isLeftButtonPressed &&
-                                raycast && brush && camera &&
-                                raycast->hasHit() &&
-                                !camera->isMovingCamera();
+                               raycast && brush && camera &&
+                               raycast->hasHit() &&
+                               !camera->isMovingCamera();
 
     if (canApplyBrush) {
         brush->enqueueStroke(raycast->hitPosition());

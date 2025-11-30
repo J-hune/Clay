@@ -274,3 +274,32 @@ void BrushManager::uploadPendingBrushes() {
         }
     }
 }
+
+void BrushManager::setCurrentBrushIndex(int index) {
+    if (m_currentBrushIndex != index) {
+        m_currentBrushIndex = index;
+        m_dirty = true;
+    }
+}
+
+void BrushManager::setBrushSize(float r) {
+    if (qAbs(m_brushSize - r) > 1e-6f) {
+        m_brushSize = r;
+        m_dirty = true;
+    }
+}
+
+void BrushManager::setBrushStrength(float s) {
+    if (qAbs(m_brushStrength - s) > 1e-6f) {
+        m_brushStrength = s;
+        m_dirty = true;
+    }
+}
+
+void BrushManager::setOperation(BrushOpType op) {
+    if (m_operation != op) {
+        m_operation = op;
+        m_dirty = true;
+    }
+}
+

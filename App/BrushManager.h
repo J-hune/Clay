@@ -52,14 +52,18 @@ public:
     int brushTextureSize() const { return m_brushTextureSize; }
 
     // État courant du brush (contrôlé par l'UI)
-    void setCurrentBrushIndex(int index) { m_currentBrushIndex = index; }
+    void setCurrentBrushIndex(int index);
     int currentBrushIndex() const { return m_currentBrushIndex; }
-    void setBrushSize(float r) { m_brushSize = r; }
+    void setBrushSize(float r);
     float brushSize() const { return m_brushSize; }
-    void setBrushStrength(float s) { m_brushStrength = s; }
+    void setBrushStrength(float s);
     float brushStrength() const { return m_brushStrength; }
-    void setOperation(BrushOpType op) { m_operation = op; }
+    void setOperation(BrushOpType op);
     BrushOpType operation() const { return m_operation; }
+
+    // Dirty flag pour le rendu
+    bool isDirty() const { return m_dirty; }
+    void clearDirty() { m_dirty = false; }
 
     // Permet de définir ou récupérer le dossier de stockage des brushes
     void setStorageDirectory(const QString &dir) { m_storageDir = dir; }
@@ -86,6 +90,7 @@ private:
     float m_brushSize = 2.0f;
     float m_brushStrength = 1.0f;
     BrushOpType m_operation = BrushOpType::Raise;
+    bool m_dirty = false;
 
     // File de strokes à appliquer
     std::vector<PendingStroke> m_pendingStrokes;

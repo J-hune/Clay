@@ -52,6 +52,7 @@ void GLRenderer::synchronize(QQuickFramebufferObject *item) {
 
     syncViewportState();
     syncTerrain();
+    syncBrush();
     syncInteractionState();
 }
 
@@ -117,13 +118,20 @@ void GLRenderer::syncTerrain() {
         m_terrainReady = true;
         requestRedraw(RedrawReason::TerrainChanged);
     }
+}
 
-    // Mise à jour de la prévisualisation du brush
-    m_terrainGpu.setBrushPreview(
-        m_brushManager.currentBrushIndex(),
-        m_brushManager.brushSize(),
-        m_brushManager.brushStrength()
-    );
+void GLRenderer::syncBrush() {
+    if (m_brushManager.isDirty()) {
+        // Mise à jour de la prévisualisation du brush
+        m_terrainGpu.setBrushPreview(
+            m_brushManager.currentBrushIndex(),
+            m_brushManager.brushSize(),
+            m_brushManager.brushStrength()
+        );
+
+        requestRedraw(RedrawReason::BrushChanged);
+        m_brushManager.clearDirty();
+    }
 }
 
 void GLRenderer::syncInteractionState() {
