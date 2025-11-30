@@ -70,6 +70,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: parent.top
         terrainManager: terrainManager
+        glViewport: glView
     }
 
     Rectangle {

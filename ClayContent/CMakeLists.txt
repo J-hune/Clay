@@ -21,6 +21,7 @@ qt6_add_qml_module(ClayContent
         "images/magnifying-glass-plus.svg"
         "images/person-running.svg"
         "images/layer-plus.svg"
+        "images/arrow-down-to-bracket.svg"
         "images/grid.svg"
         "images/empty_axis.svg"
         "images/chevron-down.svg"

@@ -5,6 +5,12 @@
 #include <QQuickFramebufferObject>
 #include <QtCore/QTimer>
 
+// Structure pour stocker une demande d'export
+struct ExportRequest {
+    QString filePath;
+    bool pending = false;
+};
+
 // Forward declarations
 class CameraControllerQml;
 class BrushManagerQml;
@@ -65,6 +71,9 @@ public:
     // Accès à la grille (pour le renderer)
     const Grid& grid() const { return m_grid; }
 
+    // Export de heightmap (invocable depuis QML)
+    Q_INVOKABLE void exportHeightmap(const QString &filePath);
+
 signals:
     void gridResolutionChanged();
     void drawGridChanged();
@@ -103,7 +112,9 @@ private:
     QObject* m_brushManager = nullptr;
     QObject* m_raycastController = nullptr;
     QObject* m_terrainManager = nullptr;
+
+    // Demande d'export en attente
+    ExportRequest m_exportRequest;
 };
 
 #endif // CLAYAPP_GLVIEWPORT_H
-

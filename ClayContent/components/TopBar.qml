@@ -9,6 +9,7 @@ Rectangle {
     border.width: 0
 
     required property var terrainManager
+    required property var glViewport
 
     property bool terrainPopupVisible: false
 
@@ -27,8 +28,8 @@ Rectangle {
         // Bouton Terrain stylisé
         Rectangle {
             id: terrainButton
-            width: 100
-            height: 44
+            width: terrainText.paintedWidth + 60
+            height: 40
             radius: 22
             anchors.verticalCenter: parent.verticalCenter
             color: terrainMouseArea.pressed ? "#4a4d52" : (terrainMouseArea.containsMouse ? "#4c566a" : "#3a3d42")
@@ -54,6 +55,7 @@ Rectangle {
                 }
 
                 Text {
+                    id: terrainText
                     anchors.verticalCenter: parent.verticalCenter
                     text: "Terrain"
                     color: "#e5e9f0"
@@ -69,6 +71,72 @@ Rectangle {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: terrainPopupVisible = !terrainPopupVisible
             }
+        }
+
+        // Bouton Export Heightmap
+        Rectangle {
+            id: exportButton
+            width: exportText.paintedWidth + 60
+            height: 40
+            radius: 22
+            anchors.verticalCenter: parent.verticalCenter
+            color: exportMouseArea.pressed ? "#4a4d52" : (exportMouseArea.containsMouse ? "#5e81ac" : "#4c566a")
+            border.width: 0
+            enabled: terrainManager.ready
+            opacity: enabled ? 1.0 : 0.4
+
+            Behavior on color {
+                ColorAnimation {
+                    duration: 100
+                }
+            }
+
+            Row {
+                anchors.centerIn: parent
+                spacing: 8
+
+                Image {
+                    anchors.verticalCenter: parent.verticalCenter
+                    sourceSize.width: 16
+                    sourceSize.height: 16
+                    source: "../images/arrow-down-to-bracket.svg"
+                    fillMode: Image.PreserveAspectFit
+                    opacity: exportMouseArea.containsMouse ? 1.0 : 0.7
+                }
+
+                Text {
+                    id: exportText
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Exporter"
+                    color: "#e5e9f0"
+                    font.pixelSize: 14
+                    font.weight: Font.Medium
+                }
+            }
+
+            MouseArea {
+                id: exportMouseArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                enabled: parent.enabled
+                onClicked: exportDialog.open()
+            }
+        }
+    }
+
+    // Dialog pour exporter la heightmap
+    FileDialog {
+        id: exportDialog
+        fileMode: FileDialog.SaveFile
+        title: "Exporter Heightmap (PNG 16-bit)"
+        nameFilters: ["Images PNG (*.png)"]
+        defaultSuffix: "png"
+        currentFolder: "file://" + Qt.resolvedUrl(".").toString().replace("file://", "") + "../../"
+
+        onAccepted: {
+            var filePath = selectedFile.toString()
+            glViewport.exportHeightmap(filePath)
         }
     }
 
