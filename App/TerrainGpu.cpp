@@ -1,140 +1,68 @@
 #include "TerrainGpu.h"
 #include <QRgba64>
 #include <algorithm>
+#include <QFile>
+#include <QCoreApplication>
+#include <QDir>
 #include "Log.h"
 
-static const char *kVS = R"GLSL(
-#version 440 core
-layout(location = 0) in vec2 aUV;
+static QString loadShaderSource(const QString &filename) {
+    const QString exeDir = QCoreApplication::applicationDirPath();
+    const QString shaderPath = QDir(exeDir).filePath(QStringLiteral("shaders/%1").arg(filename));
 
-uniform sampler2D uHeight;
-uniform mat4 uMVP;
-uniform float uHeightScale;
-
-out float vHeight;
-out vec2 vUV;
-out vec3 vWorldPos;
-
-void main() {
-    vec2 worldSize = vec2(100.0, 100.0); // taille fixe
-    vUV = aUV;
-    float h = texture(uHeight, aUV).r * uHeightScale;
-    vHeight = h;
-    vec2 posXZ = (aUV - vec2(0.5)) * worldSize;
-    vWorldPos = vec3(posXZ.x, h, posXZ.y);
-    gl_Position = uMVP * vec4(posXZ.x, h, posXZ.y, 1.0);
-}
-)GLSL";
-
-static const char *kFS = R"GLSL(
-#version 440 core
-
-uniform sampler2D uHeight;
-uniform float uHeightScale;
-uniform float uTexSize; // résolution de la heightmap
-uniform vec3 uHitPos; // Position du hit du raycast
-uniform float uHitValid; // 1.0 si hit valide, 0.0 sinon
-uniform vec3 uCameraForward; // direction avant de la caméra
-
-// Brush preview
-uniform sampler2DArray uBrushArray;
-uniform int uBrushIndex;
-uniform float uBrushSize;
-
-in float vHeight;
-in vec2 vUV;
-in vec3 vWorldPos;
-
-out vec4 fragColor;
-
-// Calcule une normale approchée depuis la texture height (centrée)
-vec3 computeNormal(vec2 uv) {
-    float texel = 1.0 / uTexSize;
-    float hL = texture(uHeight, uv + vec2(-texel, 0.0)).r * uHeightScale;
-    float hR = texture(uHeight, uv + vec2( texel, 0.0)).r * uHeightScale;
-    float hD = texture(uHeight, uv + vec2(0.0, -texel)).r * uHeightScale;
-    float hU = texture(uHeight, uv + vec2(0.0,  texel)).r * uHeightScale;
-    // Gradient
-    float dx = hR - hL;
-    float dz = hU - hD;
-    vec3 n = normalize(vec3(-dx, 2.0, -dz));
-    return n;
-}
-
-vec3 gradientColor(float hNorm) {
-    // Couleurs clés
-    vec3 low  = vec3(0.08, 0.25, 0.10);   // sombre
-    vec3 mid  = vec3(0.15, 0.50, 0.20);   // vert moyen
-    vec3 high = vec3(0.80, 0.80, 0.75);   // sommet clair (neige)
-    if (hNorm < 0.5) {
-        float t = hNorm / 0.5;
-        return mix(low, mid, t);
-    } else {
-        float t = (hNorm - 0.5) / 0.5;
-        return mix(mid, high, t);
-    }
-}
-
-void main() {
-    float safeScale = max(uHeightScale, 0.0001);
-    float hNorm = clamp(vHeight / safeScale, 0.0, 1.0); // normalisation (0..1)
-    vec3 baseCol = gradientColor(hNorm);
-
-    // Normal + lumière directionnelle simple
-    vec3 N = computeNormal(vUV);
-    vec3 L = normalize(vec3(0.4, 1.0, 0.3));
-    float diff = max(dot(N, L), 0.0);
-    float ambient = 0.35;
-    vec3 lit = baseCol * (ambient + diff * 0.65);
-
-    // Aperçu du brush : on utilise la texture du brush
-    if (uHitValid > 0.5 && uBrushSize > 0.0 && uBrushIndex >= 0) {
-        // Coordonnées locales [0,1] dans l'espace du brush (plan XZ)
-        vec2 delta = vWorldPos.xz - uHitPos.xz;
-
-        // On calcule l'angle de rotation basé sur la direction de la caméra (yaw)
-        vec2 cameraDir2D = normalize(uCameraForward.xz);
-        float angle = atan(cameraDir2D.x, -cameraDir2D.y);
-
-        // Matrice de rotation 2D
-        float c = cos(angle);
-        float s = sin(angle);
-        mat2 rotation = mat2(c, -s, s, c);
-
-        vec2 rotatedDelta = rotation * delta;
-        vec2 local = rotatedDelta / (uBrushSize * 2.0) + 0.5;
-
-        // si on est dans le carré
-        if (local.x >= 0.0 && local.x <= 1.0 &&
-            local.y >= 0.0 && local.y <= 1.0) {
-
-            float texVal = texture(uBrushArray, vec3(local, float(uBrushIndex))).r;
-            lit = mix(lit, vec3(0.627, 0.796, 0.835), texVal);
-        }
+    QFile file(shaderPath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        LOG_ERROR() << "Impossible d'ouvrir le fichier shader: " << shaderPath.toStdString();
+        return QString();
     }
 
-    fragColor = vec4(lit, 1.0);
+    QString source = QString::fromUtf8(file.readAll());
+    LOG_INFO() << "Shader chargé: " << shaderPath.toStdString();
+    return source;
 }
-)GLSL";
 
 void TerrainGpu::ensureProgram(const QOpenGLFunctions *gl) {
     Q_UNUSED(gl);
     if (m_program && m_program->isLinked()) return;
+
     m_program.reset(new QOpenGLShaderProgram());
-    if (!m_program->addShaderFromSourceCode(QOpenGLShader::Vertex, kVS)) {
+
+    // Charger le vertex shader
+    QString vertexSource = loadShaderSource("terrain.vert");
+    if (vertexSource.isEmpty()) {
+        LOG_ERROR() << "Impossible de charger terrain.vert";
+        m_program.reset();
+        return;
+    }
+
+    if (!m_program->addShaderFromSourceCode(QOpenGLShader::Vertex, vertexSource)) {
         LOG_ERROR() << "Échec compilation Vertex Shader terrain: " << m_program->log().toStdString();
+        m_program.reset();
         return;
     }
-    if (!m_program->addShaderFromSourceCode(QOpenGLShader::Fragment, kFS)) {
+
+    // Charger le fragment shader
+    QString fragmentSource = loadShaderSource("terrain.frag");
+    if (fragmentSource.isEmpty()) {
+        LOG_ERROR() << "Impossible de charger terrain.frag";
+        m_program.reset();
+        return;
+    }
+
+    if (!m_program->addShaderFromSourceCode(QOpenGLShader::Fragment, fragmentSource)) {
         LOG_ERROR() << "Échec compilation Fragment Shader terrain: " << m_program->log().toStdString();
+        m_program.reset();
         return;
     }
+
     m_program->bindAttributeLocation("aUV", 0);
+
     if (!m_program->link()) {
         LOG_ERROR() << "Échec link du programme shader terrain: " << m_program->log().toStdString();
         m_program.reset();
         return;
     }
+
     LOG_INFO() << "Shaders terrain compilés et liés";
 }
 

@@ -297,6 +297,7 @@ Rectangle {
             z: 998
 
             MouseArea {
+                acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
                 anchors.fill: parent
                 onPressed: (mouse) => {
                     // Vérifier si le clic est en dehors du popup et du bouton chevron

@@ -1,163 +1,23 @@
 #include "TerrainRaycast.h"
 #include <QOpenGLShader>
+#include <QCoreApplication>
+#include <QDir>
 #include "Log.h"
 
-static const char *computeShaderSource = R"(
-#version 430 core
+static QString loadShaderSource(const QString &filename) {
+    const QString exeDir = QCoreApplication::applicationDirPath();
+    const QString shaderPath = QDir(exeDir).filePath(QStringLiteral("shaders/%1").arg(filename));
 
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
-
-// SSBO pour le résultat
-layout(std430, binding = 0) buffer ResultBuffer {
-    vec4 worldPos;       // position mondiale (w non utilisé)
-    vec4 worldNormal;    // normale (w non utilisé)
-    float hitFlag;       // 1.0 si hit, 0.0 sinon
-    float pad1, pad2, pad3;
-};
-
-// Heightmap
-uniform sampler2D uHeightmap;
-
-// Paramètres
-uniform vec2 uMouseNDC;          // Position souris en NDC [-1,1]
-uniform mat4 uInvViewProj;       // Inverse(Projection * View)
-uniform float uHeightScale;
-uniform int uHeightmapRes;
-uniform vec4 uTerrainBounds;     // (minX, maxX, minZ, maxZ)
-
-// Fonction pour obtenir la hauteur du terrain à une position XZ donnée
-float getTerrainHeight(vec2 xz) {
-    vec2 terrainMin = uTerrainBounds.xz;
-    vec2 terrainMax = uTerrainBounds.yw;
-    vec2 uv = (xz - terrainMin) / (terrainMax - terrainMin);
-
-    // Retourne une valeur sentinelle si hors bounds
-    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0)
-        return -1e8;
-
-    return texture(uHeightmap, uv).r * uHeightScale;
-}
-
-// Calcule la normale au point XZ
-vec3 computeNormal(vec2 xz) {
-    float terrainSizeX = uTerrainBounds.y - uTerrainBounds.x;
-    float terrainSizeZ = uTerrainBounds.w - uTerrainBounds.z;
-    float delta = (terrainSizeX + terrainSizeZ) * 0.5 / float(uHeightmapRes);
-
-    float hL = getTerrainHeight(xz + vec2(-delta, 0.0));
-    float hR = getTerrainHeight(xz + vec2(delta, 0.0));
-    float hD = getTerrainHeight(xz + vec2(0.0, -delta));
-    float hU = getTerrainHeight(xz + vec2(0.0, delta));
-
-    vec3 tangentX = vec3(2.0 * delta, hR - hL, 0.0);
-    vec3 tangentZ = vec3(0.0, hU - hD, 2.0 * delta);
-
-    return normalize(cross(tangentZ, tangentX));
-}
-
-void main() {
-    // Reconstruction du rayon depuis la position NDC de la souris
-    vec4 nearPoint = uInvViewProj * vec4(uMouseNDC, -1.0, 1.0);
-    nearPoint /= nearPoint.w;
-
-    vec4 farPoint = uInvViewProj * vec4(uMouseNDC, 1.0, 1.0);
-    farPoint /= farPoint.w;
-
-    vec3 rayOrigin = nearPoint.xyz;
-    vec3 rayDir = normalize(farPoint.xyz - nearPoint.xyz);
-
-    const int maxSteps = 512;
-    const float maxDist = 1000.0;
-    const int binarySteps = 10;
-    const float epsilon = 0.01;
-
-    float stepSize = maxDist / float(maxSteps);
-    bool hit = false;
-    vec3 hitPos = vec3(0.0);
-
-    // Vérification rapide si le rayon démarre sous le terrain
-    float h0 = getTerrainHeight(rayOrigin.xz);
-    if (h0 > -9e7 && rayOrigin.y <= h0) {
-        hit = true;
-        hitPos = rayOrigin;
+    QFile file(shaderPath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        LOG_ERROR() << "Impossible d'ouvrir le fichier shader: " << shaderPath.toStdString();
+        return QString();
     }
 
-    // Raymarch pour trouver l'intersection
-    if (!hit) {
-        float t = 0.0;
-        float candidateT = -1.0;
-
-        // Phase 1: recherche grossière
-        for (int i = 0; i < maxSteps; i++) {
-            vec3 p = rayOrigin + rayDir * t;
-            float terrainH = getTerrainHeight(p.xz);
-
-            // Ignorer les points hors bounds
-            if (terrainH < -9e7) {
-                t += stepSize;
-                if (t > maxDist) break;
-                continue;
-            }
-
-            // Intersection détectée
-            if (p.y <= terrainH) {
-                candidateT = t;
-                break;
-            }
-
-            t += stepSize;
-            if (t > maxDist) break;
-        }
-
-        // Phase 2: raffinement par binary search
-        if (candidateT > 0.0) {
-            float tMin = max(candidateT - stepSize, 0.0);
-            float tMax = candidateT;
-
-            for (int j = 0; j < binarySteps; j++) {
-                float tMid = 0.5 * (tMin + tMax);
-                vec3 pMid = rayOrigin + rayDir * tMid;
-                float hMid = getTerrainHeight(pMid.xz);
-
-                if (hMid < -9e7 || pMid.y > hMid) {
-                    tMin = tMid;
-                } else {
-                    tMax = tMid;
-                }
-            }
-
-            // Validation du point final
-            hitPos = rayOrigin + rayDir * tMax;
-            float finalH = getTerrainHeight(hitPos.xz);
-
-            // Vérifier que le hit est strictement à l'intérieur des bounds
-            // (évite les faux positifs sur les bords du terrain)
-            vec2 terrainMin = uTerrainBounds.xz;
-            vec2 terrainMax = uTerrainBounds.yw;
-
-            bool strictlyInBounds = (hitPos.x > terrainMin.x + epsilon &&
-                                     hitPos.x < terrainMax.x - epsilon &&
-                                     hitPos.z > terrainMin.y + epsilon &&
-                                     hitPos.z < terrainMax.y - epsilon);
-
-            if (finalH > -9e7 && hitPos.y <= finalH + epsilon && strictlyInBounds) {
-                hit = true;
-            }
-        }
-    }
-
-    // Écriture du résultat dans le SSBO
-    if (hit) {
-        worldPos = vec4(hitPos, 1.0);
-        worldNormal = vec4(computeNormal(hitPos.xz), 0.0);
-        hitFlag = 1.0;
-    } else {
-        worldPos = vec4(0.0);
-        worldNormal = vec4(0.0, 1.0, 0.0, 0.0);
-        hitFlag = 0.0;
-    }
+    QString source = QString::fromUtf8(file.readAll());
+    LOG_INFO() << "Shader chargé: " << shaderPath.toStdString();
+    return source;
 }
-)";
 
 void TerrainRaycast::initialize(QOpenGLExtraFunctions *gl) {
     ensureProgram(gl);
@@ -177,7 +37,14 @@ void TerrainRaycast::ensureProgram(QOpenGLExtraFunctions *gl) {
 
     m_computeProgram.reset(new QOpenGLShaderProgram);
 
-    if (!m_computeProgram->addShaderFromSourceCode(QOpenGLShader::Compute, computeShaderSource)) {
+    QString shaderSource = loadShaderSource("terrain_raycast.comp");
+    if (shaderSource.isEmpty()) {
+        LOG_ERROR() << "Impossible de charger le shader terrain_raycast.comp";
+        m_computeProgram.reset();
+        return;
+    }
+
+    if (!m_computeProgram->addShaderFromSourceCode(QOpenGLShader::Compute, shaderSource)) {
         LOG_ERROR() << "Erreur de compilation du compute shader: " << m_computeProgram->log().toStdString();
         m_computeProgram.reset();
         return;

@@ -339,6 +339,7 @@ Rectangle {
             z: 999
 
             MouseArea {
+                acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
                 anchors.fill: parent
                 onPressed: (mouse) => {
                     // On vérifie que le clic n'est pas dans le menu

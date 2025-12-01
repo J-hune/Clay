@@ -148,3 +148,7 @@ void BrushManagerQml::refreshBrushModel() {
     emit brushCountChanged();
     emit brushModelChanged();
 }
+
+void BrushManagerQml::notifyLoadingProgress() {
+    emit loadingProgressChanged();
+}
