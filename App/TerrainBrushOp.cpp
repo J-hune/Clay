@@ -51,7 +51,7 @@ void main() {
     vec2 delta = worldXZ - brushCenter;
 
     vec2 cameraDir = normalize(uCameraForward.xz);
-    float angle = atan(cameraDir.y, cameraDir.x);
+    float angle = atan(cameraDir.x, -cameraDir.y);
 
     // Matrice de rotation 2D
     float c = cos(angle);

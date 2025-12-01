@@ -94,7 +94,7 @@ void main() {
 
         // On calcule l'angle de rotation basé sur la direction de la caméra (yaw)
         vec2 cameraDir2D = normalize(uCameraForward.xz);
-        float angle = atan(cameraDir2D.y, cameraDir2D.x);
+        float angle = atan(cameraDir2D.x, -cameraDir2D.y);
 
         // Matrice de rotation 2D
         float c = cos(angle);
