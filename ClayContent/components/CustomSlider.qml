@@ -172,6 +172,7 @@ FocusScope {
             z: 999
 
             MouseArea {
+                acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
                 anchors.fill: parent
                 onPressed: (mouse) => {
                     // Vérifier si le clic est en dehors du slider

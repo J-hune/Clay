@@ -55,6 +55,9 @@ public:
     // Appelé par GLRenderer après loadFromDirectory pour mettre à jour le modèle
     void refreshBrushModel();
 
+    // Appelé par GLRenderer après uploadPendingBrushes pour notifier le QML du progrès
+    void notifyLoadingProgress();
+
 signals:
     void brushIndexChanged();
     void brushSizeChanged();

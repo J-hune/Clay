@@ -32,6 +32,7 @@ public:
 
     Mode mode() const { return m_mode; }
     bool isMovingCamera() const { return m_rightButtonDown || m_middleButtonDown; }
+    bool isLeftButtonPressed() const { return m_leftButtonDown; }
 
     // Entrées clavier
     void handleKeyPress(const QKeyEvent *e) {
@@ -60,6 +61,11 @@ public:
 
     // Entrées souris
     void handleMousePress(const QMouseEvent *e, QQuickWindow *window) {
+        // Tracking du bouton gauche pour l'application du brush
+        if (e->button() == Qt::LeftButton) {
+            m_leftButtonDown = true;
+        }
+
         // Gestion du double‑clic molette d'abord
         if (e->button() == Qt::MiddleButton) {
             const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
@@ -118,7 +124,9 @@ public:
     }
 
     void handleMouseRelease(const QMouseEvent *e, QQuickWindow *window) {
-        if (e->button() == Qt::RightButton) {
+        if (e->button() == Qt::LeftButton) {
+            m_leftButtonDown = false;
+        } else if (e->button() == Qt::RightButton) {
             m_rightButtonDown = false;
 
             // Restaure le curseur et repositionne-le
@@ -171,6 +179,7 @@ private:
     QMap<MoveDirection, bool> m_moveDirections;
 
     // État souris
+    bool m_leftButtonDown = false;
     bool m_rightButtonDown = false;
     bool m_middleButtonDown = false;
     QPoint m_lastMousePos;

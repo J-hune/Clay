@@ -3,13 +3,6 @@
 
 #include "Grid.h"
 #include <QQuickFramebufferObject>
-#include <QtCore/QTimer>
-
-// Structure pour stocker une demande d'export
-struct ExportRequest {
-    QString filePath;
-    bool pending = false;
-};
 
 // Forward declarations
 class CameraControllerQml;
@@ -18,18 +11,25 @@ class RaycastControllerQml;
 class TerrainManagerQml;
 
 /**
- * @brief GLViewport - Responsable uniquement du rendering OpenGL
- * Les composants (Camera, Brush, Raycast, Terrain) sont gérés par des QObject séparés
+ * @brief GLViewport - Point d'entrée pour le rendu OpenGL et la gestion des événements
+ *
+ * Responsabilités :
+ * - Capture des événements utilisateur (souris, clavier)
+ * - Propriétés visuelles (grille, axes, FPS)
+ * - Création du renderer OpenGL
+ *
+ * La logique métier est déléguée aux composants QML et au GLRenderer.
  */
 class GLViewport : public QQuickFramebufferObject {
     Q_OBJECT
 
+    // Propriétés d'affichage
     Q_PROPERTY(int gridResolution READ gridResolution WRITE setGridResolution NOTIFY gridResolutionChanged)
     Q_PROPERTY(bool drawGrid READ drawGrid WRITE setDrawGrid NOTIFY drawGridChanged)
     Q_PROPERTY(bool drawAxes READ drawAxes WRITE setDrawAxes NOTIFY drawAxesChanged)
     Q_PROPERTY(float fps READ fps NOTIFY fpsChanged)
 
-    // Références aux composants externes
+    // Composants métier (injectés depuis QML)
     Q_PROPERTY(QObject* cameraController READ cameraController WRITE setCameraController NOTIFY cameraControllerChanged)
     Q_PROPERTY(QObject* brushManager READ brushManager WRITE setBrushManager NOTIFY brushManagerChanged)
     Q_PROPERTY(QObject* raycastController READ raycastController WRITE setRaycastController NOTIFY raycastControllerChanged)
@@ -40,39 +40,46 @@ public:
 
     [[nodiscard]] Renderer *createRenderer() const override;
 
-    // Synchronisation avec le renderer
-    void setFpsFromRenderer(float fps);
-
-    // Grid properties
+    // Propriétés d'affichage
     int gridResolution() const { return m_grid.resolution(); }
     void setGridResolution(int r);
+
     bool drawGrid() const { return m_drawGrid; }
     void setDrawGrid(bool v);
+
     bool drawAxes() const { return m_drawAxes; }
     void setDrawAxes(bool v);
+
     float fps() const { return m_fps; }
+    void setFpsFromRenderer(float fps); // Appelé par le renderer
 
     // Accès aux composants
     QObject* cameraController() const { return m_cameraController; }
     void setCameraController(QObject* controller);
+
     QObject* brushManager() const { return m_brushManager; }
     void setBrushManager(QObject* manager);
+
     QObject* raycastController() const { return m_raycastController; }
     void setRaycastController(QObject* controller);
+
     QObject* terrainManager() const { return m_terrainManager; }
     void setTerrainManager(QObject* manager);
 
-    // Accès typé pour le renderer
+    // Accès pour le renderer
+    const Grid& grid() const { return m_grid; }
+
     CameraControllerQml* cameraControllerTyped() const;
     BrushManagerQml* brushManagerTyped() const;
     RaycastControllerQml* raycastControllerTyped() const;
     TerrainManagerQml* terrainManagerTyped() const;
 
-    // Accès à la grille (pour le renderer)
-    const Grid& grid() const { return m_grid; }
-
-    // Export de heightmap (invocable depuis QML)
+    // Export
     Q_INVOKABLE void exportHeightmap(const QString &filePath);
+
+    // Undo/Redo
+    Q_INVOKABLE void undo();
+    Q_INVOKABLE void redo();
 
 signals:
     void gridResolutionChanged();
@@ -96,25 +103,19 @@ protected:
 private:
     friend class GLRenderer;
 
-    void applyBrushAtCurrentPosition();
-
     Grid m_grid;
-    float m_fps = 0.f;
     bool m_drawGrid = true;
     bool m_drawAxes = true;
-    bool m_isLeftButtonPressed = false;
+    float m_fps = 0.f;
 
-    // Timer pour application continue du brush
-    QTimer m_brushTimer;
-
-    // Pointeurs vers les composants externes
     QObject* m_cameraController = nullptr;
     QObject* m_brushManager = nullptr;
     QObject* m_raycastController = nullptr;
     QObject* m_terrainManager = nullptr;
 
-    // Demande d'export en attente
-    ExportRequest m_exportRequest;
+    QString m_pendingExportPath;
+    bool m_pendingUndo = false;
+    bool m_pendingRedo = false;
 };
 
 #endif // CLAYAPP_GLVIEWPORT_H

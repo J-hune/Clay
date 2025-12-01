@@ -603,6 +603,7 @@ Rectangle {
         id: overlayLoader
         active: terrainPopupVisible
         sourceComponent: MouseArea {
+            acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
             parent: Overlay.overlay || topBar.Window.contentItem || topBar.parent
             anchors.fill: parent
             z: 9999
