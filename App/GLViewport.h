@@ -77,10 +77,6 @@ public:
     // Export
     Q_INVOKABLE void exportHeightmap(const QString &filePath);
 
-    // Undo/Redo
-    Q_INVOKABLE void undo();
-    Q_INVOKABLE void redo();
-
 signals:
     void gridResolutionChanged();
     void drawGridChanged();
@@ -114,8 +110,6 @@ private:
     QObject* m_terrainManager = nullptr;
 
     QString m_pendingExportPath;
-    bool m_pendingUndo = false;
-    bool m_pendingRedo = false;
 };
 
 #endif // CLAYAPP_GLVIEWPORT_H
