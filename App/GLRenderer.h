@@ -3,35 +3,16 @@
 
 #include <QQuickFramebufferObject>
 #include <QElapsedTimer>
-#include <QVector2D>
 
 #include "CameraController.h"
 #include "TerrainGpu.h"
 #include "RaycastController.h"
 #include "BrushManager.h"
 #include "TerrainBrushOp.h"
+#include "RenderState.h"
 
 class GLViewport; // forward
 
-enum class RedrawReason {
-    None            = 0,
-    TerrainChanged  = 1 << 0,
-    GridChanged     = 1 << 1,
-    CameraMoved     = 1 << 2,
-    RaycastChanged  = 1 << 3,
-    BrushChanged    = 1 << 4
-};
-
-inline RedrawReason operator|(RedrawReason a, RedrawReason b) {
-    return static_cast<RedrawReason>(static_cast<int>(a) | static_cast<int>(b));
-}
-inline RedrawReason& operator|=(RedrawReason &a, RedrawReason b) {
-    a = a | b;
-    return a;
-}
-inline bool operator&(RedrawReason a, RedrawReason b) {
-    return (static_cast<int>(a) & static_cast<int>(b)) != 0;
-}
 
 class GLRenderer : public QQuickFramebufferObject::Renderer, protected QOpenGLExtraFunctions {
 public:
@@ -40,62 +21,63 @@ public:
     void render() override;
     QOpenGLFramebufferObject *createFramebufferObject(const QSize &size) override;
 
-    // Export de heightmap
     bool exportHeightmap(const QString &filePath);
 
 private:
-    // Synchronize helpers
+    // Constantes
+    static constexpr float TERRAIN_MIN_X = -50.0f;
+    static constexpr float TERRAIN_MAX_X = 50.0f;
+    static constexpr float TERRAIN_MIN_Z = -50.0f;
+    static constexpr float TERRAIN_MAX_Z = 50.0f;
+
+    // Synchronisation (GUI -> Render thread)
     void syncViewportState();
     void syncTerrain();
-    void syncInteractionState();
-    void syncBrush();
+    void syncBrushManager();
+    void syncMousePosition();
+    void syncExportRequest();
 
-    // Render helpers
+    // Boucle de rendu
     float computeDeltaTime();
     void updateFPS(float dt);
     void updateCamera(float dt, bool &cameraDirty);
     bool shouldRenderFrame(bool cameraDirty) const;
-    void prepareGLState();
-    void computeMatrices(QMatrix4x4 &proj, QMatrix4x4 &view);
-    void drawScene(const QMatrix4x4 &proj, const QMatrix4x4 &view);
+    
+    void drawFrame();
     void processRaycast(const QMatrix4x4 &proj, const QMatrix4x4 &view);
-    void finalizeFrame();
 
-    // Brush application
+    // Application des brushes
     void applyPendingStrokes();
+    void applyContinuousBrush();
+    void applyBrushAtPosition(const QVector3D &worldPos, int brushIndex,
+                              float size, float strength, BrushOpType operation);
 
-    // Redraw policy
-    void requestRedraw(RedrawReason reason);
-
-    // Matrix helpers
-    void updateProjectionMatrix(int width, int height, QMatrix4x4 &proj);
-    void updateViewMatrix(const Camera &camera, QMatrix4x4 &view);
+    // Helpers
+    void initializeBrushManager();
+    void linkQmlControllers();
+    void updateBrushAsyncLoading();
+    bool canApplyContinuousBrush() const;
 
 private:
+    // Chronomètre pour le calcul du delta time
     QElapsedTimer m_timer;
+
+    // Pointeur vers le viewport QML
     GLViewport *m_viewport = nullptr;
-    bool m_drawGrid = true;
-    bool m_drawAxes = true;
-    float m_fpsAccum = -1.f;
+    
+    // État global du rendu (flags, cache, etc.)
+    RenderState m_state;
+    
+    // Ressources GPU pour le rendu du terrain
     TerrainGpu m_terrainGpu;
-    bool m_terrainReady = false;
-    int m_lastTerrainRevision = -1;
-
-    // Etats précédents pour détecter un changement côté QML
-    int m_prevGridResolution = -1;
-    bool m_prevDrawGrid = true;
-    bool m_prevDrawAxes = true;
-
-    bool m_mouseMoved = false;
-    QVector2D m_lastMouseNDC{0.f, 0.f};
-
-    // (instances partagées)
+    
+    // Contrôleurs partagés entre le thread GUI et le thread de rendu
     CameraController m_cameraController;
     RaycastController m_raycastController;
     BrushManager m_brushManager;
-
+    
+    // Opérateur de brush pour modifier le terrain
     TerrainBrushOp m_brushOp;
-    RedrawReason m_redrawReasons = RedrawReason::None;
 };
 
 #endif // CLAYAPP_GLRENDERER_H

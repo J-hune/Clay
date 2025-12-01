@@ -9,23 +9,35 @@
 #include "Grid.h"
 #include "ImageUtils.h"
 #include "Log.h"
+#include "SceneRenderer.h"
 #include <QOpenGLFramebufferObjectFormat>
 #include <QDir>
 
 GLRenderer::GLRenderer(GLViewport *viewport) : m_viewport(viewport) {
     initializeOpenGLFunctions();
     m_timer.start();
+
     m_terrainGpu.initialize(this);
     m_raycastController.initialize(this);
+    m_brushOp.initialize(this);
+
+    initializeBrushManager();
+    linkQmlControllers();
+
+    LOG_INFO() << "GLRenderer initialisé";
+}
+
+void GLRenderer::initializeBrushManager() {
     m_brushManager.initialize();
 
-    // Configure le dossier de stockage des brushes à <exe>/brushes
     const QString exeDir = QCoreApplication::applicationDirPath();
     const QString brushesDir = QDir(exeDir).filePath(QStringLiteral("brushes"));
+
     m_brushManager.setStorageDirectory(brushesDir);
     m_brushManager.loadFromDirectory(brushesDir);
+}
 
-    // Injection des instances partagées dans les wrappers QML
+void GLRenderer::linkQmlControllers() {
     if (auto* brushQml = m_viewport->brushManagerTyped()) {
         brushQml->setSharedManager(&m_brushManager);
         brushQml->refreshBrushModel();
@@ -38,13 +50,9 @@ GLRenderer::GLRenderer(GLViewport *viewport) : m_viewport(viewport) {
     if (auto* cameraQml = m_viewport->cameraControllerTyped()) {
         cameraQml->setSharedController(&m_cameraController);
     }
-
-    m_brushOp.initialize(this);
-    LOG_INFO() << "GLRenderer initialisé";
 }
 
 void GLRenderer::synchronize(QQuickFramebufferObject *item) {
-    // On s'attend à recevoir le même viewport passé au constructeur
     auto *glItem = qobject_cast<GLViewport*>(item);
     if (!glItem) return;
 
@@ -52,47 +60,77 @@ void GLRenderer::synchronize(QQuickFramebufferObject *item) {
 
     syncViewportState();
     syncTerrain();
-    syncBrush();
-    syncInteractionState();
+    syncBrushManager();
+    syncMousePosition();
+    syncExportRequest();
+}
 
-    // Traiter la demande d'export si présente
-    if (m_viewport->m_exportRequest.pending) {
-        exportHeightmap(m_viewport->m_exportRequest.filePath);
-        m_viewport->m_exportRequest.pending = false;
+void GLRenderer::syncExportRequest() {
+    if (!m_viewport->m_pendingExportPath.isEmpty()) {
+        exportHeightmap(m_viewport->m_pendingExportPath);
+        m_viewport->m_pendingExportPath.clear();
+    }
+}
+
+void GLRenderer::updateBrushAsyncLoading() {
+    m_brushManager.uploadPendingBrushes();
+
+    if (m_brushManager.pendingUploadsCount() > 0) {
+        m_viewport->update();
+    }
+
+    if (auto* brushQml = m_viewport->brushManagerTyped()) {
+        brushQml->notifyLoadingProgress();
     }
 }
 
 void GLRenderer::syncViewportState() {
     if (!m_viewport) return;
 
-    // FPS -> viewport
-    m_viewport->setFpsFromRenderer(m_fpsAccum);
+    m_viewport->setFpsFromRenderer(m_state.fpsAccum);
 
-    // Flags affichage
-    m_drawGrid = m_viewport->drawGrid();
-    m_drawAxes = m_viewport->drawAxes();
+    m_state.drawGrid = m_viewport->drawGrid();
+    m_state.drawAxes = m_viewport->drawAxes();
 
-    // Upload des brushes en attente (dans le thread de rendu)
-    const int prevPending = m_brushManager.pendingUploadsCount();
-    m_brushManager.uploadPendingBrushes();
-    const int newPending = m_brushManager.pendingUploadsCount();
+    // Détecte les changements de résolution de grille ou de flags d'affichage
+    const int currentGridRes = m_viewport->grid().resolution();
+    if (m_state.prevGridResolution != currentGridRes ||
+        m_state.prevDrawGrid != m_state.drawGrid ||
+        m_state.prevDrawAxes != m_state.drawAxes) {
+        m_state.requestRedraw(RedrawReason::GridChanged);
+        m_state.prevGridResolution = currentGridRes;
+        m_state.prevDrawGrid = m_state.drawGrid;
+        m_state.prevDrawAxes = m_state.drawAxes;
+    }
+}
 
-    // Notifier l'UI si la progression a changé
-    if (prevPending != newPending) {
-        if (auto* brushQml = m_viewport->brushManagerTyped()) {
-            emit brushQml->loadingProgressChanged();
-        }
+void GLRenderer::syncBrushManager() {
+    if (!m_viewport) return;
+
+    // Met à jour l'aperçu du brush si nécessaire
+    if (m_brushManager.isDirty()) {
+        m_terrainGpu.setBrushPreview(
+            m_brushManager.currentBrushIndex(),
+            m_brushManager.brushSize(),
+            m_brushManager.brushStrength()
+        );
+        m_state.requestRedraw(RedrawReason::BrushChanged);
+        m_brushManager.clearDirty();
     }
 
-    // Détection des changements
-    const int currentGridRes = m_viewport->grid().resolution();
-    if (m_prevGridResolution != currentGridRes ||
-        m_prevDrawGrid != m_drawGrid ||
-        m_prevDrawAxes != m_drawAxes) {
-        requestRedraw(RedrawReason::GridChanged);
-        m_prevGridResolution = currentGridRes;
-        m_prevDrawGrid = m_drawGrid;
-        m_prevDrawAxes = m_drawAxes;
+    // Gère le chargement asynchrone des brushes
+    updateBrushAsyncLoading();
+}
+
+void GLRenderer::syncMousePosition() {
+    if (!m_viewport) return;
+
+    if (auto* raycastQml = m_viewport->raycastControllerTyped()) {
+        const QVector2D currentNDC = raycastQml->mouseNDC();
+        if ((currentNDC - m_state.lastMouseNDC).lengthSquared() > 1e-6f) {
+            m_state.mouseMoved = true;
+            m_state.lastMouseNDC = currentNDC;
+        }
     }
 }
 
@@ -102,65 +140,41 @@ void GLRenderer::syncTerrain() {
     auto* terrainQml = m_viewport->terrainManagerTyped();
     if (!terrainQml) return;
 
-    // Vérifier si le terrain a besoin d'être uploadé
-    if (terrainQml->needsUpload() && terrainQml->revision() != m_lastTerrainRevision) {
-        m_lastTerrainRevision = terrainQml->revision();
+    // Vérifie si le terrain nécessite un upload (changement de configuration)
+    if (!terrainQml->needsUpload() || terrainQml->revision() == m_state.lastTerrainRevision) {
+        return;
+    }
 
-        // Configuration du terrain GPU
-        m_terrainGpu.setGridResolution(terrainQml->resolution(), terrainQml->resolution());
-        m_terrainGpu.setTextureResolution(terrainQml->heightmapResolution());
+    m_state.lastTerrainRevision = terrainQml->revision();
 
-        // Reconstruction selon le mode
-        if (terrainQml->mode() == 1 && !terrainQml->heightmapSource().isEmpty()) {
-            const QImage img = loadHeightImage(terrainQml->heightmapSource());
-            if (!img.isNull()) {
-                m_terrainGpu.rebuild(this, img, terrainQml->heightScale());
-                LOG_INFO() << "Terrain reconstruit (heightmap) - res=" << terrainQml->resolution()
-                           << ", texRes=" << terrainQml->heightmapResolution()
-                           << ", scale=" << terrainQml->heightScale();
-            } else {
-                m_terrainGpu.rebuildFlat(this, terrainQml->heightScale());
-                LOG_WARN() << "Impossible de charger la heightmap, terrain plat utilisé";
-            }
-        } else {
-            m_terrainGpu.rebuildFlat(this, terrainQml->heightScale());
-            LOG_INFO() << "Terrain plat reconstruit - res=" << terrainQml->resolution()
+    // Configure la résolution du terrain GPU
+    m_terrainGpu.setGridResolution(terrainQml->resolution(), terrainQml->resolution());
+    m_terrainGpu.setTextureResolution(terrainQml->heightmapResolution());
+
+    // Reconstruit le terrain selon le mode (heightmap ou plat)
+    const bool useHeightmap = (terrainQml->mode() == 1) && !terrainQml->heightmapSource().isEmpty();
+
+    if (useHeightmap) {
+        const QImage img = loadHeightImage(terrainQml->heightmapSource());
+        if (!img.isNull()) {
+            m_terrainGpu.rebuild(this, img, terrainQml->heightScale());
+            LOG_INFO() << "Terrain reconstruit depuis heightmap - res=" << terrainQml->resolution()
                        << ", texRes=" << terrainQml->heightmapResolution()
                        << ", scale=" << terrainQml->heightScale();
+        } else {
+            m_terrainGpu.rebuildFlat(this, terrainQml->heightScale());
+            LOG_WARN() << "Échec du chargement de la heightmap, utilisation d'un terrain plat";
         }
-
-        terrainQml->setNeedsUpload(false);
-        m_terrainReady = true;
-        requestRedraw(RedrawReason::TerrainChanged);
+    } else {
+        m_terrainGpu.rebuildFlat(this, terrainQml->heightScale());
+        LOG_INFO() << "Terrain plat reconstruit - res=" << terrainQml->resolution()
+                   << ", texRes=" << terrainQml->heightmapResolution()
+                   << ", scale=" << terrainQml->heightScale();
     }
-}
 
-void GLRenderer::syncBrush() {
-    if (m_brushManager.isDirty()) {
-        // Mise à jour de la prévisualisation du brush
-        m_terrainGpu.setBrushPreview(
-            m_brushManager.currentBrushIndex(),
-            m_brushManager.brushSize(),
-            m_brushManager.brushStrength()
-        );
-
-        requestRedraw(RedrawReason::BrushChanged);
-        m_brushManager.clearDirty();
-    }
-}
-
-void GLRenderer::syncInteractionState() {
-    if (!m_viewport) return;
-
-    auto* raycastQml = m_viewport->raycastControllerTyped();
-    if (raycastQml) {
-        const QVector2D currentNDC = raycastQml->mouseNDC();
-        // On vérifie si la position de la souris a changé
-        if ((currentNDC - m_lastMouseNDC).lengthSquared() > 1e-6f) {
-            m_mouseMoved = true;
-            m_lastMouseNDC = currentNDC;
-        }
-    }
+    terrainQml->setNeedsUpload(false);
+    m_state.terrainReady = true;
+    m_state.requestRedraw(RedrawReason::TerrainChanged);
 }
 
 void GLRenderer::render() {
@@ -175,13 +189,48 @@ void GLRenderer::render() {
     }
 
     applyPendingStrokes();
-    prepareGLState();
+    applyContinuousBrush();
+    drawFrame();
 
+    // Demande un nouveau rendu si le brush est actif (clic maintenu)
+    // Utilise QMetaObject::invokeMethod pour appeler update() dans le thread GUI
+    if (canApplyContinuousBrush()) {
+        QMetaObject::invokeMethod(m_viewport, "update", Qt::QueuedConnection);
+    }
+
+    // Nettoie l'état pour la prochaine frame
+    m_state.clearRedrawReasons();
+    m_state.mouseMoved = false;
+}
+
+void GLRenderer::drawFrame() {
+    const int w = framebufferObject()->width();
+    const int h = framebufferObject()->height();
+
+    // Prépare l'état OpenGL et nettoie le framebuffer
+    SceneRenderer::setupRenderState(this, w, h);
+    SceneRenderer::clearFramebuffer(this);
+
+    // Calcule les matrices de projection et de vue
     QMatrix4x4 proj, view;
-    computeMatrices(proj, view);
-    drawScene(proj, view);
+    SceneRenderer::computeMatrices(w, h, m_cameraController, proj, view);
+
+    // Dessine la scène complète (terrain, grille, axes)
+    SceneRenderer::drawScene(
+        this,
+        m_viewport->grid(),
+        m_terrainGpu,
+        m_brushManager.brushTextureArrayId(),
+        m_state.drawGrid,
+        m_state.drawAxes,
+        m_state.terrainReady,
+        proj,
+        view,
+        m_cameraController.camera().frontVector()
+    );
+
+    // Effectue le raycast pour déterminer la position du brush
     processRaycast(proj, view);
-    finalizeFrame();
 }
 
 float GLRenderer::computeDeltaTime() {
@@ -194,10 +243,10 @@ float GLRenderer::computeDeltaTime() {
 void GLRenderer::updateFPS(float dt) {
     if (dt > 0.f) {
         const float instantFps = 1.0f / dt;
-        if (m_fpsAccum < 0.f) {
-            m_fpsAccum = instantFps;
+        if (m_state.fpsAccum < 0.f) {
+            m_state.fpsAccum = instantFps;
         } else {
-            m_fpsAccum = m_fpsAccum * 0.9f + instantFps * 0.1f;
+            m_state.fpsAccum = m_state.fpsAccum * 0.9f + instantFps * 0.1f;
         }
     }
 }
@@ -212,59 +261,29 @@ void GLRenderer::updateCamera(float dt, bool &cameraDirty) {
 }
 
 bool GLRenderer::shouldRenderFrame(bool cameraDirty) const {
-    const bool hasRedrawReason = (m_redrawReasons != RedrawReason::None);
-    const bool hasPendingStrokes = !m_brushManager.pendingStrokes().empty();
-    return hasRedrawReason || cameraDirty || m_mouseMoved || hasPendingStrokes;
-}
+    // Vérifie toutes les conditions qui nécessitent un nouveau rendu
+    if (m_state.shouldRedraw()) return true;
+    if (cameraDirty) return true;
+    if (m_state.mouseMoved) return true;
+    if (!m_brushManager.pendingStrokes().empty()) return true;
+    if (m_brushManager.pendingUploadsCount() > 0) return true;
 
-void GLRenderer::prepareGLState() {
-    glViewport(0, 0, framebufferObject()->width(), framebufferObject()->height());
-    glEnable(GL_DEPTH_TEST);
-    glClearColor(0.129f, 0.141f, 0.161f, 1);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-}
+    // Vérifie si le brush est en cours d'application continue
+    const bool isApplyingBrush = m_cameraController.isLeftButtonPressed()
+                               && !m_cameraController.isMovingCamera()
+                               && m_raycastController.hasHit();
 
-void GLRenderer::computeMatrices(QMatrix4x4 &proj, QMatrix4x4 &view) {
-    const int w = framebufferObject()->width();
-    const int h = framebufferObject()->height();
-
-    updateProjectionMatrix(w, h, proj);
-    updateViewMatrix(m_cameraController.camera(), view);
-}
-
-void GLRenderer::updateProjectionMatrix(int width, int height, QMatrix4x4 &proj) {
-    const float aspect = height > 0 ? static_cast<float>(width) / static_cast<float>(height) : 1.0f;
-    proj.perspective(60.f, aspect, 0.1f, 1000.f);
-    proj.scale(1.f, -1.f, 1.f);
-}
-
-void GLRenderer::updateViewMatrix(const Camera &camera, QMatrix4x4 &view) {
-    view = camera.viewMatrix();
-}
-
-void GLRenderer::drawScene(const QMatrix4x4 &proj, const QMatrix4x4 &view) {
-    glMatrixMode(GL_PROJECTION);
-    glLoadMatrixf(proj.constData());
-    glMatrixMode(GL_MODELVIEW);
-    glLoadMatrixf(view.constData());
-
-    m_viewport->grid().draw(this, m_drawGrid, m_drawAxes);
-
-    if (m_terrainReady) {
-        m_terrainGpu.setBrushTextureArray(m_brushManager.brushTextureArrayId());
-        m_terrainGpu.draw(this, proj, view, m_cameraController.camera().frontVector());
-    }
+    return isApplyingBrush;
 }
 
 void GLRenderer::processRaycast(const QMatrix4x4 &proj, const QMatrix4x4 &view) {
-    if (!m_terrainReady || !m_viewport) return;
+    if (!m_state.terrainReady || !m_viewport) return;
 
     auto* raycastQml = m_viewport->raycastControllerTyped();
     auto* terrainQml = m_viewport->terrainManagerTyped();
-
     if (!raycastQml || !terrainQml) return;
 
-    // Si la caméra bouge, on réinitialise le raycast
+    // Réinitialise le raycast si la caméra est en mouvement
     if (m_cameraController.isMovingCamera()) {
         m_terrainGpu.clearRaycastHit();
         m_raycastController.reset();
@@ -272,118 +291,137 @@ void GLRenderer::processRaycast(const QMatrix4x4 &proj, const QMatrix4x4 &view) 
         return;
     }
 
-    // Sinon, on effectue le raycast
-    if (m_mouseMoved) {
-        m_raycastController.updateMousePosition(raycastQml->mouseNDC());
-        m_raycastController.perform(
-            this,
-            proj,
-            view,
-            m_terrainGpu.heightmapTexture(),
-            terrainQml->heightmapResolution(),
-            terrainQml->heightScale()
-        );
+    // Effectue le raycast uniquement si la souris a bougé
+    // On pourrait faire une version ou on teste si le clic est maintenu aussi mais je trouve ça moins bien
+    // const bool needsRaycast = m_state.mouseMoved || m_cameraController.isLeftButtonPressed();
+    if (!m_state.mouseMoved) return;
 
-        const bool hasHit = m_raycastController.hasHit();
-        const QVector3D hitPos = m_raycastController.hitPosition();
+    m_raycastController.updateMousePosition(raycastQml->mouseNDC());
+    m_raycastController.perform(
+        this,
+        proj,
+        view,
+        m_terrainGpu.heightmapTexture(),
+        terrainQml->heightmapResolution(),
+        terrainQml->heightScale()
+    );
 
-        if (hasHit) {
-            m_terrainGpu.setRaycastHit(hitPos);
-            raycastQml->notifyRaycastComplete(hasHit, hitPos);
-            requestRedraw(RedrawReason::RaycastChanged);
-        } else {
-            m_terrainGpu.clearRaycastHit();
-            raycastQml->notifyRaycastComplete(hasHit, QVector3D());
-        }
+    const bool hasHit = m_raycastController.hasHit();
+    const QVector3D hitPos = m_raycastController.hitPosition();
+
+    if (hasHit) {
+        m_terrainGpu.setRaycastHit(hitPos);
+        raycastQml->notifyRaycastComplete(true, hitPos);
+        m_state.requestRedraw(RedrawReason::RaycastChanged);
+    } else {
+        m_terrainGpu.clearRaycastHit();
+        raycastQml->notifyRaycastComplete(false, QVector3D());
     }
 }
 
+void GLRenderer::applyBrushAtPosition(const QVector3D &worldPos, int brushIndex,
+                                      float size, float strength, BrushOpType operation) {
+    auto* terrainQml = m_viewport->terrainManagerTyped();
+    if (!terrainQml || !m_brushManager.isValidBrushIndex(brushIndex)) return;
+
+
+    m_brushOp.applyBrush(
+        this,
+        operation,
+        m_terrainGpu.heightmapTexture(),
+        terrainQml->heightmapResolution(),
+        worldPos,
+        size,
+        strength,
+        m_brushManager.brushTextureArrayId(),
+        brushIndex,
+        TERRAIN_MIN_X, TERRAIN_MAX_X,
+        TERRAIN_MIN_Z, TERRAIN_MAX_Z,
+        terrainQml->heightScale(),
+        m_cameraController.camera().frontVector()
+    );
+
+    m_state.requestRedraw(RedrawReason::TerrainChanged);
+}
+
 void GLRenderer::applyPendingStrokes() {
-    if (!m_terrainReady) return;
+    if (!m_state.terrainReady) return;
 
     const auto &strokes = m_brushManager.pendingStrokes();
     if (strokes.empty()) return;
 
-    auto* terrainQml = m_viewport->terrainManagerTyped();
-    if (!terrainQml) return;
-
     for (const auto &stroke : strokes) {
-        if (!m_brushManager.isValidBrushIndex(stroke.brushIndex)) continue;
-
-        const auto opType = static_cast<BrushOpType>(stroke.operation);
-
-        m_brushOp.applyBrush(
-            this,
-            opType,
-            m_terrainGpu.heightmapTexture(),
-            terrainQml->heightmapResolution(),
+        applyBrushAtPosition(
             stroke.worldPos,
+            stroke.brushIndex,
             stroke.size,
             stroke.strength,
-            m_brushManager.brushTextureArrayId(),
-            stroke.brushIndex,
-            -50.0f, 50.0f,
-            -50.0f, 50.0f,
-            terrainQml->heightScale(),
-            m_cameraController.camera().frontVector()
+            stroke.operation
         );
     }
 
     m_brushManager.clearPendingStrokes();
-    requestRedraw(RedrawReason::TerrainChanged);
 }
 
-void GLRenderer::finalizeFrame() {
-    // Reset des raisons de redraw
-    m_redrawReasons = RedrawReason::None;
-    m_mouseMoved = false;
-
-    // On demande la prochaine frame
-    update();
+bool GLRenderer::canApplyContinuousBrush() const {
+    return m_cameraController.isLeftButtonPressed()
+        && !m_cameraController.isMovingCamera()
+        && m_raycastController.hasHit();
 }
 
-void GLRenderer::requestRedraw(RedrawReason reason) {
-    m_redrawReasons |= reason;
-    QMetaObject::invokeMethod(m_viewport, "update", Qt::QueuedConnection);
+void GLRenderer::applyContinuousBrush() {
+    if (!m_state.terrainReady || !m_viewport) return;
+    if (!canApplyContinuousBrush()) return;
+
+    applyBrushAtPosition(
+        m_raycastController.hitPosition(),
+        m_brushManager.currentBrushIndex(),
+        m_brushManager.brushSize(),
+        m_brushManager.brushStrength(),
+        m_brushManager.operation()
+    );
 }
 
 QOpenGLFramebufferObject *GLRenderer::createFramebufferObject(const QSize &size) {
     QOpenGLFramebufferObjectFormat fmt;
     fmt.setAttachment(QOpenGLFramebufferObject::CombinedDepthStencil);
-    requestRedraw(RedrawReason::TerrainChanged); // Premier dessin
+
+    // Demande un premier rendu de la scène
+    m_state.requestRedraw(RedrawReason::TerrainChanged);
+
     auto *fbo = new QOpenGLFramebufferObject(size, fmt);
     LOG_INFO() << "FBO créé: " << size.width() << "x" << size.height();
     return fbo;
 }
 
 bool GLRenderer::exportHeightmap(const QString &filePath) {
-    if (!m_terrainReady) {
-        LOG_WARN() << "Impossible d'exporter: terrain non prêt";
+    if (!m_state.terrainReady) {
+        LOG_WARN() << "Export impossible: terrain non initialisé";
         return false;
     }
 
-    LOG_INFO() << "Export heightmap vers:" << filePath.toStdString();
+    LOG_INFO() << "Début de l'export de la heightmap vers: " << filePath.toStdString();
 
-    // Utiliser la méthode GPU pour exporter
-    QImage heightmap = m_terrainGpu.exportHeightmap16(this);
+    // Récupère la heightmap depuis le GPU au format 16 bits
+    const QImage heightmap = m_terrainGpu.exportHeightmap16(this);
     if (heightmap.isNull()) {
-        LOG_ERROR() << "Échec de l'export depuis le GPU";
+        LOG_ERROR() << "Échec de la récupération de la heightmap depuis le GPU";
         return false;
     }
 
-    // Convertir le chemin QML (peut être file://) en chemin local
+    // Convertit le chemin QML (file://...) en chemin local si nécessaire
     QString localPath = filePath;
     if (localPath.startsWith("file://")) {
         localPath = localPath.mid(7);
     }
 
+    // Sauvegarde l'image en PNG
     const bool success = heightmap.save(localPath, "PNG");
     if (success) {
-        LOG_INFO() << "Heightmap exportée avec succès:" << localPath.toStdString();
+        LOG_INFO() << "Heightmap exportée avec succès: " << localPath.toStdString();
     } else {
-        LOG_ERROR() << "Échec de la sauvegarde de la heightmap:" << localPath.toStdString();
+        LOG_ERROR() << "Échec de la sauvegarde de l'image: " << localPath.toStdString();
     }
 
     return success;
 }
-

@@ -12,10 +12,6 @@ GLViewport::GLViewport(QQuickItem *parent) : QQuickFramebufferObject(parent) {
     setFlag(ItemIsFocusScope, true);
     setFlag(ItemAcceptsInputMethod, true);
     setFocus(true);
-
-    // Configuration du timer pour l'application continue du brush
-    m_brushTimer.setInterval(16); // ~60 FPS
-    connect(&m_brushTimer, &QTimer::timeout, this, &GLViewport::applyBrushAtCurrentPosition);
 }
 
 void GLViewport::setFpsFromRenderer(float fps) {
@@ -103,25 +99,18 @@ void GLViewport::keyReleaseEvent(QKeyEvent *event) {
 }
 
 void GLViewport::mousePressEvent(QMouseEvent *event) {
-    if (event->button() == Qt::LeftButton) {
-        m_isLeftButtonPressed = true;
-        auto *raycast = raycastControllerTyped();
-        auto *brush = brushManagerTyped();
-        auto *camera = cameraControllerTyped();
-
-        if (raycast && brush && raycast->hasHit() && camera && !camera->isMovingCamera()) {
-            brush->enqueueStroke(raycast->hitPosition());
-            if (!m_brushTimer.isActive()) {
-                m_brushTimer.start();
-            }
-        }
-    }
-
+    // Transférer l'événement à la caméra
     if (auto *camera = cameraControllerTyped()) {
         camera->handleMousePress(event, window());
     }
+
+    // Si c'est un clic gauche, déclenche le rendu pour commencer l'application du brush
+    // Le renderer vérifiera automatiquement s'il y a un hit raycast valide
+    if (event->button() == Qt::LeftButton) {
+        update();  // Démarre le cycle de rendu continu
+    }
+
     forceActiveFocus();
-    update();
 }
 
 void GLViewport::mouseMoveEvent(QMouseEvent *event) {
@@ -141,38 +130,23 @@ void GLViewport::mouseMoveEvent(QMouseEvent *event) {
     // Gestion du mouvement de caméra
     if (camera) {
         camera->handleMouseMove(event, const_cast<QQuickWindow *>(w), localPos, rect);
-
-        // On arrête le timer si on commence à bouger la caméra
-        if (camera->isMovingCamera() && m_brushTimer.isActive()) {
-            m_brushTimer.stop();
-        }
     }
 
-    // Mise à jour du raycast
+    // Mise à jour du raycast (le renderer gérera l'application du brush)
     if (raycast) {
         const QPointF itemPos = mapFromScene(localPos);
         raycast->updateMousePosition(itemPos, static_cast<float>(width()), static_cast<float>(height()));
-
-        // Application du brush si clic gauche maintenu
-        if (m_isLeftButtonPressed && raycast->hasHit() && camera && !camera->isMovingCamera()) {
-            if (auto *brush = brushManagerTyped()) {
-                brush->enqueueStroke(raycast->hitPosition());
-            }
-        }
     }
 
     update();
 }
 
 void GLViewport::mouseReleaseEvent(QMouseEvent *event) {
-    if (event->button() == Qt::LeftButton) {
-        m_isLeftButtonPressed = false;
-        m_brushTimer.stop();
-    }
-
     if (auto *camera = cameraControllerTyped()) {
         camera->handleMouseRelease(event, window());
     }
+
+    // Déclenche une dernière frame pour nettoyer l'état du brush
     update();
 }
 
@@ -211,35 +185,12 @@ void GLViewport::hoverMoveEvent(QHoverEvent *event) {
     }
 }
 
-void GLViewport::applyBrushAtCurrentPosition() {
-    auto *raycast = raycastControllerTyped();
-    auto *brush = brushManagerTyped();
-    auto *camera = cameraControllerTyped();
-
-    // Vérifier toutes les conditions pour appliquer le brush
-    const bool canApplyBrush = m_isLeftButtonPressed &&
-                               raycast && brush && camera &&
-                               raycast->hasHit() &&
-                               !camera->isMovingCamera();
-
-    if (canApplyBrush) {
-        brush->enqueueStroke(raycast->hitPosition());
-        update();
-        if (window()) {
-            window()->update();
-        }
-    } else if (m_brushTimer.isActive()) {
-        // Arrêter le timer si les conditions ne sont plus remplies
-        m_brushTimer.stop();
-    }
-}
-
 QQuickFramebufferObject::Renderer *GLViewport::createRenderer() const {
     return new GLRenderer(const_cast<GLViewport *>(this));
 }
 
 void GLViewport::exportHeightmap(const QString &filePath) {
-    // On stocke la demande d'export qui sera traitée dans le thread de rendu
-    m_exportRequest = {filePath, true};
+    // Stocker le chemin pour traitement dans le thread de rendu
+    m_pendingExportPath = filePath;
     update();
 }
