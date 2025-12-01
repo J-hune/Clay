@@ -10,6 +10,7 @@
 #include "BrushManager.h"
 #include "TerrainBrushOp.h"
 #include "RenderState.h"
+#include "UndoRedoManager.h"
 
 class GLViewport; // forward
 
@@ -52,6 +53,10 @@ private:
     void applyBrushAtPosition(const QVector3D &worldPos, int brushIndex,
                               float size, float strength, BrushOpType operation);
 
+    // Undo/Redo
+    void performUndo();
+    void performRedo();
+
     // Helpers
     void initializeBrushManager();
     void linkQmlControllers();
@@ -64,20 +69,23 @@ private:
 
     // Pointeur vers le viewport QML
     GLViewport *m_viewport = nullptr;
-    
+
     // État global du rendu (flags, cache, etc.)
     RenderState m_state;
-    
+
     // Ressources GPU pour le rendu du terrain
     TerrainGpu m_terrainGpu;
-    
+
     // Contrôleurs partagés entre le thread GUI et le thread de rendu
     CameraController m_cameraController;
     RaycastController m_raycastController;
     BrushManager m_brushManager;
-    
+
     // Opérateur de brush pour modifier le terrain
     TerrainBrushOp m_brushOp;
+
+    // Gestionnaire d'undo/redo
+    UndoRedoManager m_undoRedoManager;
 };
 
 #endif // CLAYAPP_GLRENDERER_H
