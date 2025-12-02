@@ -9,6 +9,8 @@ Rectangle {
     color: "transparent"
 
     required property var brushManager
+    property int cellSize: 68
+    property int cellSpacing: 8
 
     Column {
         id: brushSection
@@ -154,45 +156,118 @@ Rectangle {
             width: parent.width
             spacing: 10
 
-            Row {
+            Item {
                 width: parent.width
-                spacing: 10
+                height: controlsRow.height
 
-                Text {
-                    text: "Galerie (" + brushManager.brushCount + " pinceaux)"
-                    color: "#d8dee9"
-                    font.pixelSize: 13
-                    font.weight: Font.Medium
-                }
+                Row {
+                    id: leftRow
+                    spacing: 10
 
-                // Indicateur de chargement
-                Rectangle {
-                    visible: !brushManager.isLoadingComplete
-                    width: 100
-                    height: 16
-                    color: "#1e2024"
-                    radius: 8
-                    border.color: "#3a3d42"
-                    border.width: 1
-                    anchors.verticalCenter: parent.verticalCenter
+                    Text {
+                        text: "Galerie (" + brushManager.brushCount + " pinceaux)"
+                        color: "#d8dee9"
+                        font.pixelSize: 13
+                        font.weight: Font.Medium
+                    }
 
                     Rectangle {
-                        width: parent.width * brushManager.loadingProgress
-                        height: parent.height
-                        color: "#5e81ac"
+                        visible: !brushManager.isLoadingComplete
+                        width: 100
+                        height: 16
+                        color: "#1e2024"
                         radius: 8
+                        border.color: "#3a3d42"
+                        border.width: 1
+                        anchors.verticalCenter: parent.verticalCenter
 
-                        Behavior on width {
-                            NumberAnimation { duration: 150 }
+                        Rectangle {
+                            width: parent.width * brushManager.loadingProgress
+                            height: parent.height
+                            color: "#5e81ac"
+                            radius: 8
+
+                            Behavior on width {
+                                NumberAnimation { duration: 150 }
+                            }
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: Math.round(brushManager.loadingProgress * 100) + "%"
+                            color: "#e5e9f0"
+                            font.pixelSize: 10
+                            font.weight: Font.Medium
+                        }
+                    }
+                }
+
+                Row {
+                    id: controlsRow
+                    spacing: 6
+                    visible: brushManager.isLoadingComplete && brushManager.brushCount > 1
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    // Bouton -
+                    Rectangle {
+                        width: 24; height: 24
+                        color: decreaseMouseArea.containsMouse ? "#2e3440" : "#1e2024"
+                        radius: 6
+                        border.color: "#3a3d42"
+                        border.width: 1
+
+                        Behavior on color { ColorAnimation { duration: 100 } }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "−"
+                            color: "#d8dee9"
+                            font.pixelSize: 16
+                            font.weight: Font.Medium
+                        }
+
+                        MouseArea {
+                            id: decreaseMouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: if (cellSize > 32) cellSize -= 4
+                        }
+                    }
+
+                    // Bouton +
+                    Rectangle {
+                        width: 24; height: 24
+                        color: increaseMouseArea.containsMouse ? "#2e3440" : "#1e2024"
+                        radius: 6
+                        border.color: "#3a3d42"
+                        border.width: 1
+
+                        Behavior on color { ColorAnimation { duration: 100 } }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "+"
+                            color: "#d8dee9"
+                            font.pixelSize: 14
+                            font.weight: Font.Medium
+                        }
+
+                        MouseArea {
+                            id: increaseMouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: if (cellSize < 120) cellSize += 4
                         }
                     }
 
                     Text {
-                        anchors.centerIn: parent
-                        text: Math.round(brushManager.loadingProgress * 100) + "%"
-                        color: "#e5e9f0"
-                        font.pixelSize: 10
-                        font.weight: Font.Medium
+                        text: cellSize + "px"
+                        color: "#81869c"
+                        font.pixelSize: 11
+                        anchors.verticalCenter: parent.verticalCenter
                     }
                 }
             }
@@ -201,8 +276,6 @@ Rectangle {
             Grid {
                 id: brushGrid
                 width: parent.width
-                property int cellSize: 68
-                property int cellSpacing: 8
                 columns: Math.max(1, Math.floor((width + cellSpacing) / (cellSize + cellSpacing)))
                 spacing: cellSpacing
                 rowSpacing: cellSpacing
@@ -212,8 +285,8 @@ Rectangle {
                     model: brushManager.brushCount
 
                     Rectangle {
-                        width: brushGrid.cellSize
-                        height: brushGrid.cellSize
+                        width: cellSize
+                        height: cellSize
 
                         property int realBrushId: brushManager.brushModel.data(brushManager.brushModel.index(index, 0), 257)
                         property string brushFilePath: brushManager.brushModel.data(brushManager.brushModel.index(index, 0), 259)

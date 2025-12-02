@@ -10,6 +10,9 @@ Window {
 
     width: Math.round(screenW * scaleFactor)
     height: Math.round(screenH * scaleFactor)
+    
+    minimumWidth: 720
+    minimumHeight: 380
 
     visible: true
     title: "Clay"
