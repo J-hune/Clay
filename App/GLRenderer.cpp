@@ -4,6 +4,7 @@
 #include "qml/BrushManagerQml.h"
 #include "qml/RaycastControllerQml.h"
 #include "qml/TerrainManagerQml.h"
+#include "qml/ErosionControllerQml.h"
 #include "TerrainGpu.h"
 #include "CameraController.h"
 #include "Grid.h"
@@ -50,6 +51,15 @@ void GLRenderer::linkQmlControllers() {
     if (auto* cameraQml = m_viewport->cameraControllerTyped()) {
         cameraQml->setSharedController(&m_cameraController);
     }
+
+    if (auto* erosionQml = m_viewport->erosionControllerTyped()) {
+        // Connecte le signal d'érosion pour marquer qu'une érosion doit être appliquée
+        QObject::connect(erosionQml, &ErosionControllerQml::erosionRequested,
+                         m_viewport, [this]() {
+            m_viewport->m_pendingErosion = true;
+            m_viewport->update();
+        }, Qt::QueuedConnection);
+    }
 }
 
 void GLRenderer::synchronize(QQuickFramebufferObject *item) {
@@ -63,12 +73,38 @@ void GLRenderer::synchronize(QQuickFramebufferObject *item) {
     syncBrushManager();
     syncMousePosition();
     syncExportRequest();
+    syncErosion();
 }
 
 void GLRenderer::syncExportRequest() {
     if (!m_viewport->m_pendingExportPath.isEmpty()) {
         exportHeightmap(m_viewport->m_pendingExportPath);
         m_viewport->m_pendingExportPath.clear();
+    }
+}
+
+void GLRenderer::syncErosion() {
+    if (!m_viewport) return;
+
+    auto* erosionQml = m_viewport->erosionControllerTyped();
+    if (!erosionQml) return;
+
+    // Synchronise les paramètres d'érosion du thread GUI vers le thread de rendu
+    m_erosion.setIterations(erosionQml->iterations());
+    m_erosion.setNumParticles(erosionQml->numParticles());
+    m_erosion.setInertia(erosionQml->inertia());
+    m_erosion.setSedimentCapacity(erosionQml->sedimentCapacity());
+    m_erosion.setDepositionPercentage(erosionQml->depositionPercentage());
+    m_erosion.setErosionSpeed(erosionQml->erosionSpeed());
+    m_erosion.setEvaporationSpeed(erosionQml->evaporationSpeed());
+    m_erosion.setGravity(erosionQml->gravity());
+    m_erosion.setMinSlope(erosionQml->minSlope());
+    m_erosion.setMaxLifetime(erosionQml->maxLifetime());
+
+    // Applique l'érosion si une requête est en attente
+    if (m_viewport->m_pendingErosion) {
+        applyErosion();
+        m_viewport->m_pendingErosion = false;
     }
 }
 
@@ -424,4 +460,31 @@ bool GLRenderer::exportHeightmap(const QString &filePath) {
     }
 
     return success;
+}
+
+void GLRenderer::applyErosion() {
+    if (!m_terrainGpu.heightmapTexture()) {
+        LOG_ERROR() << "Impossible d'appliquer l'érosion : heightmap non initialisée";
+        return;
+    }
+
+    auto* terrainQml = m_viewport->terrainManagerTyped();
+    if (!terrainQml) {
+        LOG_ERROR() << "TerrainManager non disponible";
+        return;
+    }
+
+    LOG_INFO() << "Application de l'érosion sur le terrain...";
+
+    // Applique l'érosion en 2 passes sur la heightmap GPU
+    m_erosion.dispatch(
+        this,
+        m_terrainGpu.heightmapTexture(),
+        terrainQml->heightmapResolution()
+    );
+
+    // Marque que le terrain a changé pour forcer un redraw
+    m_state.requestRedraw(RedrawReason::TerrainChanged);
+
+    LOG_INFO() << "Érosion appliquée avec succès";
 }
