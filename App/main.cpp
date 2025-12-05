@@ -7,6 +7,7 @@
 #include "qml/BrushManagerQml.h"
 #include "qml/RaycastControllerQml.h"
 #include "qml/TerrainManagerQml.h"
+#include "qml/ErosionControllerQml.h"
 #include "autogen/environment.h"
 #include "Log.h"
 
@@ -44,6 +45,7 @@ int main(int argc, char *argv[]) {
     qmlRegisterType<BrushManagerQml>("MyGL", 1, 0, "BrushManager");
     qmlRegisterType<RaycastControllerQml>("MyGL", 1, 0, "RaycastController");
     qmlRegisterType<TerrainManagerQml>("MyGL", 1, 0, "TerrainManager");
+    qmlRegisterType<ErosionControllerQml>("MyGL", 1, 0, "ErosionController");
 
     QQmlApplicationEngine engine;
     const QUrl url(mainQmlFile);

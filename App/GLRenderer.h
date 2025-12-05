@@ -10,6 +10,7 @@
 #include "BrushManager.h"
 #include "TerrainBrushOp.h"
 #include "RenderState.h"
+#include "TerrainErosion.h"
 
 class GLViewport; // forward
 
@@ -22,6 +23,9 @@ public:
     QOpenGLFramebufferObject *createFramebufferObject(const QSize &size) override;
 
     bool exportHeightmap(const QString &filePath);
+    
+    // Application de l'érosion
+    void applyErosion();
 
 private:
     // Constantes
@@ -36,6 +40,7 @@ private:
     void syncBrushManager();
     void syncMousePosition();
     void syncExportRequest();
+    void syncErosion();
 
     // Boucle de rendu
     float computeDeltaTime();
@@ -78,6 +83,9 @@ private:
     
     // Opérateur de brush pour modifier le terrain
     TerrainBrushOp m_brushOp;
+
+    // Opérateur d'érosion de terrain
+    TerrainErosion m_erosion;
 };
 
 #endif // CLAYAPP_GLRENDERER_H

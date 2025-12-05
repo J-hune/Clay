@@ -1,0 +1,244 @@
+// ============================================================================
+// COMPUTE SHADER - GPU HYDRAULIC EROSION
+// ============================================================================
+// Architecture : 2 passes pour éviter les race conditions
+// Pass 1 : Simulation des particules + stockage des modifications
+// Pass 2 : Application des modifications sur la heightmap
+
+#version 430
+
+// ----------------------------------------------------------------------------
+// PASS 1 : SIMULATION DES PARTICULES
+// ----------------------------------------------------------------------------
+const int STEP_SIZE = 6;
+
+layout(local_size_x = 256) in;
+
+// Buffers
+layout(binding = 0, r32i) uniform readonly iimage2D heightmapInt;
+uniform int fixedPointScale;    // ex: 10000
+layout(binding = 1, std430) buffer ParticleBuffer {
+    vec4 particles[]; // xy=pos, z=sediment, w=water
+};
+layout(binding = 2, std430) buffer ModificationBuffer {
+    float modifications[]; // Stocke les changements à appliquer
+};
+
+// Paramètres
+uniform uint seed; // Seed pour RNG
+uniform float mapSize; // Taille de la heightmap
+uniform int erosionRadius; // Rayon d’érosion
+uniform float p_inertia;            // [0,1] facteur d’inertie
+uniform float p_capacity;        // facteur de capacité
+uniform float p_minSlope; // facteur de pente minimum
+uniform float p_deposition; // (pourcentage de sediment lacher quand capacité pas assez haute)
+uniform float p_erosion; // (pourcentage de sediment recuperer quand capacité trop haute)
+uniform float p_gravity; // (gravité qui influence la vitesse de particule)
+uniform float p_evaporation; // [0,1]
+uniform float init_vel;
+uniform float init_water;
+
+uniform int numParticles; // Nombre total de particules
+
+uniform int maxLifetime; // Nombre d'itération max pour une particule
+
+
+uniform vec2[] cornersBox; // Ca serait 4 coord qui forme un carré dans lequel on peut tiré des particules (a modifier si on veut d’autres formes) (potentiellement en coordonnée uv)
+
+
+// ============================================================================
+// FONCTIONS UTILITAIRES
+// ============================================================================
+
+// Générateur aléatoire simple (PCG)
+uint rngState;
+
+
+uint pcgHash(uint entry) {
+    uint state =  entry * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+float random() {
+    rngState = pcgHash(rngState);
+    return float(rngState) / 4294967296.0;
+}
+
+// helper : lire hauteur fixed-point convertie en float
+float readHeightInt(ivec2 coord) {
+    // bounds check si nécessaire selon ton usage
+    int hi = imageLoad(heightmapInt, coord).r;
+    return float(hi) / float(fixedPointScale);
+}
+
+// interpolation bilinéaire sur la texture INT
+float sampleHeight(vec2 pos) {
+    ivec2 coord = ivec2(floor(pos));
+    vec2 f = fract(pos);
+
+    float h00 = readHeightInt(coord);
+    float h10 = readHeightInt(coord + ivec2(1,0));
+    float h01 = readHeightInt(coord + ivec2(0,1));
+    float h11 = readHeightInt(coord + ivec2(1,1));
+
+    float h0 = mix(h00, h10, f.x);
+    float h1 = mix(h01, h11, f.x);
+    return mix(h0, h1, f.y);
+}
+
+// gradient interpolé (sur INT convertis en float)
+vec2 calculateGradient(vec2 pos) {
+    ivec2 coord = ivec2(floor(pos));
+    vec2 f = fract(pos);
+
+    float h00 = readHeightInt(coord);
+    float h10 = readHeightInt(coord + ivec2(1,0));
+    float h01 = readHeightInt(coord + ivec2(0,1));
+    float h11 = readHeightInt(coord + ivec2(1,1));
+
+    // gradient X et Y selon ta formule
+    float gradX = (h10 - h00) * (1.0 - f.y) + (h11 - h01) * f.y;
+    float gradY = (h01 - h00) * (1.0 - f.x) + (h11 - h10) * f.x;
+
+    return vec2(gradX, gradY);
+}
+
+
+// ============================================================================
+// STOCKAGE DES MODIFICATIONS (sans race condition)
+// ============================================================================
+
+// Chaque particule écrit dans une zone unique du buffer de modifications
+// Structure : x, y, amount, radius, fx, fy
+void storeErosion(uint particleID, int step, vec2 pos, float amount) {
+    // amount doit être négatif pour érosion
+    int baseIndex = (int(particleID) * maxLifetime + step) * STEP_SIZE;
+
+    ivec2 centerCoord = ivec2(floor(pos));
+    float fx = fract(pos.x);
+    float fy = fract(pos.y);
+
+    // Écrire x, y, amount, radius, fx, fy
+    modifications[baseIndex + 0] = float(centerCoord.x);
+    modifications[baseIndex + 1] = float(centerCoord.y);
+    modifications[baseIndex + 2] = amount; // négatif
+    modifications[baseIndex + 3] = float(erosionRadius);
+    modifications[baseIndex + 4] = fx; // pour info (peut être 0 pour érosion)
+    modifications[baseIndex + 5] = fy;
+}
+
+void storeDeposition(uint particleID, int step, vec2 pos, float amount) {
+    // amount doit être positif pour dépôt
+    int baseIndex = (int(particleID) * maxLifetime + step) * STEP_SIZE;
+
+    ivec2 coord = ivec2(floor(pos));
+    float fx = fract(pos.x);
+    float fy = fract(pos.y);
+
+    modifications[baseIndex + 0] = float(coord.x);
+    modifications[baseIndex + 1] = float(coord.y);
+    modifications[baseIndex + 2] = amount; // positif
+    modifications[baseIndex + 3] = 0.0; // radius = 0 pour dépôt ponctuel
+    modifications[baseIndex + 4] = fx;
+    modifications[baseIndex + 5] = fy;
+}
+
+
+// ============================================================================
+// SIMULATION PRINCIPALE
+// ============================================================================
+
+void main() {
+    if (gl_GlobalInvocationID.x >= uint(numParticles)) {
+        return; // Évite les invocations inutiles
+    }
+    uint particleID = gl_GlobalInvocationID.x;
+
+    // Initialisation RNG
+    rngState = pcgHash(particleID + seed);
+
+    // Spawn particule
+    vec2 pos = vec2(
+        mix(cornersBox[0].x, cornersBox[1].x, random()),
+        mix(cornersBox[0].y, cornersBox[3].y, random())
+    );
+    vec2 dir = vec2(0.0);
+    float speed = init_vel;
+    float water = init_water;
+    float sediment = 0.0;
+
+    // Simulation du lifetime
+    for (int lifetime = 0; lifetime < maxLifetime; lifetime++) {
+        // Hauteur et gradient actuels
+        float oldHeight = sampleHeight(pos);
+        vec2 gradient = calculateGradient(pos);
+
+        // Nouvelle direction (avec inertie)
+        vec2 newDir = dir * p_inertia - gradient * (1.0 - p_inertia);
+        float newLen = length(newDir);
+        if (newLen < 1e-6) {
+            // si trop petit, donne une direction aléatoire sûre
+            newDir = vec2(random()*2.0 - 1.0, random()*2.0 - 1.0);
+            newLen = length(newDir);
+            if (newLen < 1e-6) {
+                // vraiment pas de direction : stop
+                break;
+            }
+        }
+        dir = newDir / newLen; // normalisation
+
+        // Nouvelle position
+        vec2 newPos = pos + dir;
+
+        // Vérification des limites
+        if (newPos.x < 0.0 || newPos.x >= mapSize - 1.0 ||
+        newPos.y < 0.0 || newPos.y >= mapSize - 1.0) {
+            break;
+        }
+
+        // Nouvelle hauteur et delta
+        float newHeight = sampleHeight(newPos);
+        float diffHeight = newHeight - oldHeight;
+
+        // Capacité de sédiment
+        float capacity = max(-diffHeight, p_minSlope) *
+        speed * water * p_capacity;
+
+        // Érosion ou déposition
+        if (sediment > capacity || diffHeight > 0.0) {
+            // DÉPOSITION
+            float amountToDeposit = (diffHeight > 0.0) ?
+            min(diffHeight, sediment) :
+            (sediment - capacity) * p_deposition;
+            // Clamp pour éviter de déposer plus que ce qu'on a
+            amountToDeposit = min(amountToDeposit, sediment);
+            // Verification amountToDeposit non négatif
+            amountToDeposit = max(amountToDeposit, 0.0);
+            sediment -= amountToDeposit;
+            storeDeposition(particleID, lifetime, pos, amountToDeposit);
+
+        } else {
+            // ÉROSION
+            float amountToErode = min((capacity - sediment) * p_erosion,
+            -diffHeight);
+            // Clamp pour éviter d'éroder plus que la hauteur disponible
+            amountToErode = min(amountToErode, oldHeight);
+            // Verification amountToErode non négatif
+            amountToErode = max(amountToErode, 0.0);
+            // Appliquer l'érosion
+            sediment += amountToErode;
+            storeErosion(particleID, lifetime, pos, -amountToErode);
+        }
+
+        // Mise à jour physique
+        float sq = speed * speed + diffHeight * p_gravity;
+        // Clamp pour éviter racine carrée de négatif
+        sq = max(sq, 0.0);
+        speed = sqrt(sq);
+
+        water *= (1.0 - p_evaporation);
+
+        pos = newPos;
+    }
+}

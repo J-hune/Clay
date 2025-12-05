@@ -1,0 +1,17 @@
+#version 430
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0, r32i) uniform iimage2D srcInt;   // source R32I
+layout(binding = 1, r32f) uniform image2D dstFloat;  // destination R32F
+
+uniform int mapSize;
+uniform int fixedPointScale;
+
+void main() {
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    if (p.x >= mapSize || p.y >= mapSize) return;
+
+    int hi = imageLoad(srcInt, p).r;
+    float h = float(hi) / float(fixedPointScale);
+    imageStore(dstFloat, p, vec4(h,0,0,0));
+}

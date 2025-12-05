@@ -4,6 +4,7 @@
 #include "qml/BrushManagerQml.h"
 #include "qml/RaycastControllerQml.h"
 #include "qml/TerrainManagerQml.h"
+#include "qml/ErosionControllerQml.h"
 #include <QCursor>
 
 GLViewport::GLViewport(QQuickItem *parent) : QQuickFramebufferObject(parent) {
@@ -68,6 +69,12 @@ void GLViewport::setTerrainManager(QObject *manager) {
     emit terrainManagerChanged();
 }
 
+void GLViewport::setErosionController(QObject *controller) {
+    if (m_erosionController == controller) return;
+    m_erosionController = controller;
+    emit erosionControllerChanged();
+}
+
 CameraControllerQml *GLViewport::cameraControllerTyped() const {
     return qobject_cast<CameraControllerQml *>(m_cameraController);
 }
@@ -82,6 +89,10 @@ RaycastControllerQml *GLViewport::raycastControllerTyped() const {
 
 TerrainManagerQml *GLViewport::terrainManagerTyped() const {
     return qobject_cast<TerrainManagerQml *>(m_terrainManager);
+}
+
+ErosionControllerQml *GLViewport::erosionControllerTyped() const {
+    return qobject_cast<ErosionControllerQml *>(m_erosionController);
 }
 
 void GLViewport::keyPressEvent(QKeyEvent *event) {

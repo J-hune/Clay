@@ -60,6 +60,20 @@ Rectangle {
         mode: 0 // 0=Flat, 1=Heightmap
     }
 
+    ErosionController {
+        id: erosionController
+        iterations: 1
+        numParticles: 50000
+        inertia: 0.3
+        sedimentCapacity: 8.0
+        depositionPercentage: 0.1
+        erosionSpeed: 0.05
+        evaporationSpeed: 0.4
+        gravity: 4.0
+        minSlope: 0.01
+        maxLifetime: 600
+    }
+
     // ========================================
     // Interface utilisateur
     // ========================================
@@ -71,6 +85,7 @@ Rectangle {
         anchors.top: parent.top
         terrainManager: terrainManager
         glViewport: glView
+        erosionController: erosionController
     }
 
     Rectangle {
@@ -96,6 +111,7 @@ Rectangle {
             brushManager: brushManager
             raycastController: raycastController
             terrainManager: terrainManager
+            erosionController: erosionController
         }
 
         // Barre vitesse FPS
