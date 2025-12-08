@@ -155,16 +155,6 @@ Rectangle {
                 var buttonPos = terrainButton.mapToItem(parent, 0, 0)
                 return buttonPos.y + terrainButton.height + 8
             }
-
-            // Gestion de la touche Escape
-            Keys.onEscapePressed: {
-                terrainPopupVisible = false
-            }
-
-            focus: visible
-            onVisibleChanged: {
-                if (visible) forceActiveFocus()
-            }
         }
     }
 
@@ -172,25 +162,36 @@ Rectangle {
     Loader {
         id: overlayLoader
         active: terrainPopupVisible
-        sourceComponent: MouseArea {
-            acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+        sourceComponent: Item {
             parent: Overlay.overlay || topBar.Window.contentItem || topBar.parent
             anchors.fill: parent
-            z: 9999
+            z: 998
 
-            onPressed: (mouse) => {
-                // Vérifier si le clic est en dehors du bouton terrain
-                var buttonPos = terrainButton.mapToItem(parent, 0, 0)
-                var clickInButton = mouse.x >= buttonPos.x && mouse.x <= buttonPos.x + terrainButton.width &&
-                    mouse.y >= buttonPos.y && mouse.y <= buttonPos.y + terrainButton.height
+            MouseArea {
+                acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                anchors.fill: parent
+                onPressed: (mouse) => {
+                    // Récupérer le popup depuis le loader
+                    var popup = popupLoader.item
+                    if (!popup) {
+                        mouse.accepted = false
+                        return
+                    }
 
-                // Si le clic n'est pas dans le bouton, fermer le popup
-                // Le popup lui-même bloque ses propres clics avec son MouseArea
-                if (!clickInButton) {
-                    terrainPopupVisible = false
+                    // Vérifier si le clic est en dehors du popup et du bouton terrain
+                    var popupPos = mapToItem(popup, mouse.x, mouse.y)
+                    var buttonPos = mapToItem(terrainButton, mouse.x, mouse.y)
+
+                    var outsidePopup = popupPos.x < 0 || popupPos.x > popup.width || popupPos.y < 0 || popupPos.y > popup.height
+                    var outsideButton = buttonPos.x < 0 || buttonPos.x > terrainButton.width || buttonPos.y < 0 || buttonPos.y > terrainButton.height
+
+                    if (outsidePopup && outsideButton) {
+                        terrainPopupVisible = false
+                    }
+                    mouse.accepted = false
                 }
-                mouse.accepted = false
             }
         }
     }
 }
+
