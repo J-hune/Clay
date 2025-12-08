@@ -259,7 +259,7 @@ Rectangle {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: if (cellSize < 120) cellSize += 4
+                            onClicked: if (cellSize < 180) cellSize += 4
                         }
                     }
 
