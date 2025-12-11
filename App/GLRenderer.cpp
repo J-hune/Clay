@@ -570,7 +570,7 @@ void GLRenderer::applyErosion() {
         return;
     }
 
-    LOG_INFO() << "Application de l'érosion sur le terrain...";
+    LOG_DEBUG() << "Application de l'érosion sur le terrain...";
     // On s'assure que le masque est bien à jour côté système d'érosion
     m_erosion.setErosionMaskTexture(m_erosionMaskTexture);
 
@@ -584,7 +584,7 @@ void GLRenderer::applyErosion() {
     // Marque que le terrain a changé pour forcer un redraw
     m_state.requestRedraw(RedrawReason::TerrainChanged);
 
-    LOG_INFO() << "Érosion appliquée avec succès";
+    LOG_DEBUG() << "Érosion appliquée avec succès";
 }
 
 void GLRenderer::ensureErosionMaskTexture(int size) {
