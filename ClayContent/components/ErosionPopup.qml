@@ -350,7 +350,7 @@ Rectangle  {
     onVisibleChanged: {
         if (visible) {
             forceActiveFocus()
-        } else if (erosionController && erosionController.isErosionRunni ng) {
+        } else if (erosionController && erosionController.isErosionRunning) {
             glViewport.captureSnapshot() // Snapshot APRÈS l'érosion
         }
     }
