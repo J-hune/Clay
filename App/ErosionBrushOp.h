@@ -1,27 +1,18 @@
-#ifndef CLAYAPP_TERRAINBRUSHOP_H
-#define CLAYAPP_TERRAINBRUSHOP_H
+#ifndef CLAYAPP_EROSIONBRUSHOP_H
+#define CLAYAPP_EROSIONBRUSHOP_H
 
 #include <QOpenGLExtraFunctions>
 #include <QOpenGLShaderProgram>
 #include <QScopedPointer>
 
-enum class BrushOpType {
-    Raise = 0,
-    Lower = 1,
-    Smooth = 2,
-    ErosionMaskAdd = 3,
-    ErosionMaskErase = 4,
-};
-
-class TerrainBrushOp {
+class ErosionBrushOp {
 public:
     void initialize(QOpenGLExtraFunctions *gl);
     void cleanup(QOpenGLExtraFunctions *gl);
 
-    void applyBrush(QOpenGLExtraFunctions *gl,
-                   BrushOpType opType,
-                   GLuint heightmapTexture,
-                   int heightmapResolution,
+    void applyMask(QOpenGLExtraFunctions *gl,
+                   GLuint maskTexture,      // GL_R8
+                   int maskResolution,
                    const QVector3D &worldPos,
                    float brushSize,
                    float brushStrength,
@@ -31,14 +22,12 @@ public:
                    float terrainMaxX,
                    float terrainMinZ,
                    float terrainMaxZ,
-                   float heightScale,
-                   const QVector3D &cameraForward);
+                   const QVector3D &cameraForward,
+                   bool erase);
 
 private:
     void ensureProgram(QOpenGLExtraFunctions *gl);
-
-    QScopedPointer<QOpenGLShaderProgram> m_computeProgram;
+    QScopedPointer<QOpenGLShaderProgram> m_program;
 };
 
-#endif
-
+#endif // CLAYAPP_EROSIONBRUSHOP_H

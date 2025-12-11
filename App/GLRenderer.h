@@ -9,6 +9,7 @@
 #include "RaycastController.h"
 #include "BrushManager.h"
 #include "TerrainBrushOp.h"
+#include "ErosionBrushOp.h"
 #include "RenderState.h"
 #include "TerrainErosion.h"
 
@@ -56,12 +57,18 @@ private:
     void applyContinuousBrush();
     void applyBrushAtPosition(const QVector3D &worldPos, int brushIndex,
                               float size, float strength, BrushOpType operation);
+    void applyMaskAtPosition(const QVector3D &worldPos, int brushIndex,
+                             float size, float strength, bool erase);
 
     // Helpers
     void initializeBrushManager();
     void linkQmlControllers();
     void updateBrushAsyncLoading();
     bool canApplyContinuousBrush() const;
+
+    // Erosion mask management
+    void ensureErosionMaskTexture(int size);
+    void clearErosionMask();
 
 private:
     // Chronomètre pour le calcul du delta time
@@ -86,6 +93,11 @@ private:
 
     // Opérateur d'érosion de terrain
     TerrainErosion m_erosion;
+    ErosionBrushOp m_erosionBrushOp;
+
+    // Masque d'érosion
+    GLuint m_erosionMaskTexture = 0; // GL_R8
+    int m_erosionMaskSize = 0;
 };
 
 #endif // CLAYAPP_GLRENDERER_H

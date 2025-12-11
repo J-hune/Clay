@@ -77,8 +77,27 @@ void ErosionControllerQml::setMaxLifetime(int val) {
     }
 }
 
+void ErosionControllerQml::setErosionRadius(int val) {
+    if (m_erosion.erosionRadius() != val) {
+        m_erosion.setErosionRadius(val);
+        emit erosionRadiusChanged();
+    }
+}
+
+void ErosionControllerQml::setIsErosionRunning(bool val) {
+    if (m_isErosionRunning != val) {
+        m_isErosionRunning = val;
+        emit isErosionRunningChanged();
+    }
+}
+
 void ErosionControllerQml::applyErosion() {
     LOG_INFO() << "Érosion demandée depuis QML";
     emit erosionRequested();
+}
+
+void ErosionControllerQml::toggleErosion() {
+    setIsErosionRunning(!m_isErosionRunning);
+    LOG_INFO() << "Érosion continue " << (m_isErosionRunning ? "démarrée" : "arrêtée");
 }
 

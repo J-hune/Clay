@@ -36,6 +36,7 @@ class GLViewport : public QQuickFramebufferObject {
     Q_PROPERTY(QObject* raycastController READ raycastController WRITE setRaycastController NOTIFY raycastControllerChanged)
     Q_PROPERTY(QObject* terrainManager READ terrainManager WRITE setTerrainManager NOTIFY terrainManagerChanged)
     Q_PROPERTY(QObject* erosionController READ erosionController WRITE setErosionController NOTIFY erosionControllerChanged)
+    Q_PROPERTY(bool erosionUiActive READ erosionUiActive WRITE setErosionUiActive NOTIFY erosionUiActiveChanged)
 
 public:
     explicit GLViewport(QQuickItem *parent = nullptr);
@@ -71,6 +72,9 @@ public:
     QObject* erosionController() const { return m_erosionController; }
     void setErosionController(QObject* controller);
 
+    bool erosionUiActive() const { return m_erosionUiActive; }
+    void setErosionUiActive(bool v);
+
     // Accès pour le renderer
     const Grid& grid() const { return m_grid; }
 
@@ -93,6 +97,7 @@ signals:
     void raycastControllerChanged();
     void terrainManagerChanged();
     void erosionControllerChanged();
+    void erosionUiActiveChanged();
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -119,6 +124,9 @@ private:
 
     QString m_pendingExportPath;
     bool m_pendingErosion = false;
+
+    // Erosion UI state
+    bool m_erosionUiActive = false;
 };
 
 #endif // CLAYAPP_GLVIEWPORT_H

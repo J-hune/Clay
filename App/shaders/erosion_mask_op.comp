@@ -1,0 +1,66 @@
+#version 430 core
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+
+layout(r8, binding = 0) uniform image2D uMask;
+uniform sampler2DArray uBrushArray;
+
+uniform vec3 uWorldPos;
+uniform float uBrushSize;
+uniform float uBrushStrength;
+uniform int uBrushIndex;
+uniform vec4 uTerrainBounds;
+uniform int uMaskRes;
+uniform vec3 uCameraForward;
+uniform int uErase;
+
+vec2 uvToWorld(vec2 uv) {
+    vec2 tmin = uTerrainBounds.xz;
+    vec2 tmax = uTerrainBounds.yw;
+    return mix(tmin, tmax, uv);
+}
+
+void main() {
+    ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
+    if (pix.x >= uMaskRes || pix.y >= uMaskRes) return;
+
+    vec2 uv = (vec2(pix) + 0.5) / float(uMaskRes);
+    vec2 worldXZ = uvToWorld(uv);
+
+    // Espace local brush
+    vec2 delta = worldXZ - uWorldPos.xz;
+
+    // Rotation selon la direction de la caméra
+    vec2 cam2D = normalize(uCameraForward.xz);
+    float angle = atan(cam2D.x, -cam2D.y);
+    float c = cos(angle);
+    float s = sin(angle);
+    mat2 R = mat2(c, -s, s, c);
+    vec2 rd = R * delta;
+
+    vec2 brushUV = (rd / (uBrushSize * 2.0)) + 0.5;
+    if (brushUV.x < 0.0 || brushUV.x > 1.0 || brushUV.y < 0.0 || brushUV.y > 1.0) {
+        return;
+    }
+
+    float maskStamp = texture(uBrushArray, vec3(brushUV, float(uBrushIndex))).r;
+    float deltaMask = maskStamp * clamp(uBrushStrength, 0.0, 1.0);
+
+    // Seuil pour éviter les effets trop faibles
+    if (deltaMask > 0.5) {
+        deltaMask = 1;
+    } else {
+        return;
+    }
+
+    float cur = imageLoad(uMask, pix).r;
+    float outVal = cur;
+    if (uErase == 1) {
+        outVal = max(0.0, cur - deltaMask);
+    } else {
+        outVal = min(1.0, cur + deltaMask);
+    }
+
+    imageStore(uMask, pix, vec4(outVal, 0, 0, 0));
+}

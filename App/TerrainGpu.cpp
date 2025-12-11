@@ -263,6 +263,14 @@ void TerrainGpu::draw(QOpenGLFunctions *gl, const QMatrix4x4 &proj, const QMatri
         m_program->setUniformValue("uBrushArray", 1);
     }
 
+    // Erosion mask overlay
+    m_program->setUniformValue("uMaskEnabled", m_erosionMaskTex != 0 ? (m_showMaskOverlay ? 1.0f : 0.0f) : 0.0f);
+    if (m_erosionMaskTex != 0) {
+        gl->glActiveTexture(GL_TEXTURE2);
+        gl->glBindTexture(GL_TEXTURE_2D, m_erosionMaskTex);
+        m_program->setUniformValue("uErosionMask", 2);
+    }
+
     gl->glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
     gl->glEnableVertexAttribArray(0);
     gl->glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
@@ -277,6 +285,9 @@ void TerrainGpu::draw(QOpenGLFunctions *gl, const QMatrix4x4 &proj, const QMatri
     gl->glBindTexture(GL_TEXTURE_2D, 0);
     if (m_brushArray != 0) {
         gl->glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+    }
+    if (m_erosionMaskTex != 0) {
+        gl->glBindTexture(GL_TEXTURE_2D, 0);
     }
     m_program->release();
 }

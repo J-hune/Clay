@@ -9,6 +9,7 @@ Rectangle {
     color: "transparent"
 
     required property var brushManager
+    required property var glView
 
     Column {
         id: brushSection
@@ -138,6 +139,7 @@ Rectangle {
                 BrushOperations {
                     width: parent.width
                     brushManager: brushSection.parent.brushManager
+                    glView: brushSection.parent.glView
                 }
             }
         }

@@ -30,6 +30,10 @@ public:
     }
     void setBrushTextureArray(GLuint texArray) { m_brushArray = texArray; }
 
+    // Erosion mask overlay
+    void setErosionMaskTexture(GLuint tex) { m_erosionMaskTex = tex; }
+    void setShowMaskOverlay(bool v) { m_showMaskOverlay = v; }
+
     // Export de la heightmap depuis la texture GPU
     QImage exportHeightmap16(QOpenGLFunctions *gl) const;
 
@@ -66,6 +70,10 @@ private:
     float m_brushSize = 2.0f;
     float m_brushStrength = 1.0f;
     GLuint m_brushArray = 0; // texture array contenant les brushes
+
+    // Erosion mask texture (GL_R8) for visualization overlay
+    GLuint m_erosionMaskTex = 0;
+    bool m_showMaskOverlay = false;
 };
 
 #endif // CLAYAPP_TERRAINGPU_H
