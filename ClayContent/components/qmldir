@@ -11,6 +11,7 @@ BrushContextMenu 1.0 BrushContextMenu.qml
 RightBar 1.0 RightBar.qml
 CustomSlider 1.0 CustomSlider.qml
 TerrainPopup 1.0 TerrainPopup.qml
+ErosionPopup 1.0 ErosionPopup.qml
 TerrainModeSelector 1.0 TerrainModeSelector.qml
 TerrainMeshSettings 1.0 TerrainMeshSettings.qml
 TerrainHeightmapSettings 1.0 TerrainHeightmapSettings.qml

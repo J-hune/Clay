@@ -22,6 +22,7 @@ qt6_add_qml_module(ClayContent
         "components/TerrainHeightmapSettings.qml"
         "components/TerrainActions.qml"
         "components/ToggleButton.qml"
+        "components/ErosionPopup.qml"
     RESOURCES
         "images/arrow-rotate-left.svg"
         "images/magnifying-glass-plus.svg"

@@ -90,6 +90,7 @@ public:
     // Undo/Redo
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
+    Q_INVOKABLE void captureSnapshot();
 
 signals:
     void gridResolutionChanged();
@@ -129,6 +130,7 @@ private:
     QString m_pendingExportPath;
     bool m_pendingUndo = false;
     bool m_pendingRedo = false;
+    bool m_pendingSnapshot = false;
 
     bool m_pendingErosion = false;
     // Erosion UI state

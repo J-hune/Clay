@@ -64,6 +64,7 @@ private:
     // Undo/Redo
     void performUndo();
     void performRedo();
+    void performSnapshot();
 
     // Helpers
     void initializeBrushManager();
