@@ -87,6 +87,10 @@ public:
     // Export
     Q_INVOKABLE void exportHeightmap(const QString &filePath);
 
+    // Undo/Redo
+    Q_INVOKABLE void undo();
+    Q_INVOKABLE void redo();
+
 signals:
     void gridResolutionChanged();
     void drawGridChanged();
@@ -123,8 +127,10 @@ private:
     QObject* m_erosionController = nullptr;
 
     QString m_pendingExportPath;
-    bool m_pendingErosion = false;
+    bool m_pendingUndo = false;
+    bool m_pendingRedo = false;
 
+    bool m_pendingErosion = false;
     // Erosion UI state
     bool m_erosionUiActive = false;
 };

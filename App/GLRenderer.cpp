@@ -82,6 +82,16 @@ void GLRenderer::syncExportRequest() {
         exportHeightmap(m_viewport->m_pendingExportPath);
         m_viewport->m_pendingExportPath.clear();
     }
+
+    if (m_viewport->m_pendingUndo) {
+        performUndo();
+        m_viewport->m_pendingUndo = false;
+    }
+
+    if (m_viewport->m_pendingRedo) {
+        performRedo();
+        m_viewport->m_pendingRedo = false;
+    }
 }
 
 void GLRenderer::syncErosion() {
@@ -220,6 +230,11 @@ void GLRenderer::syncTerrain() {
     terrainQml->setNeedsUpload(false);
     m_state.terrainReady = true;
     m_state.requestRedraw(RedrawReason::TerrainChanged);
+
+    // Capture le snapshot initial pour l'historique undo/redo
+    m_undoRedoManager.clear();  // Efface l'ancien historique
+    m_undoRedoManager.captureSnapshot(this, m_terrainGpu.heightmapTexture(), terrainQml->heightmapResolution());
+    LOG_INFO() << "Snapshot initial capturé pour undo/redo";
 }
 
 void GLRenderer::render() {
@@ -228,6 +243,22 @@ void GLRenderer::render() {
 
     bool cameraDirty = false;
     updateCamera(dt, cameraDirty);
+
+    // Détecte si le brush vient d'être relâché pour terminer le batch
+    const bool brushCurrentlyActive = canApplyContinuousBrush();
+    if (m_state.wasBrushActive && !brushCurrentlyActive) {
+        // Le brush a été relâché, termine le batch et capture le snapshot final
+        if (m_undoRedoManager.isBatching()) {
+            m_undoRedoManager.endBatch();
+
+            // Capture le snapshot après toutes les modifications
+            auto* terrainQml = m_viewport->terrainManagerTyped();
+            if (terrainQml) {
+                m_undoRedoManager.captureSnapshot(this, m_terrainGpu.heightmapTexture(), terrainQml->heightmapResolution());
+            }
+        }
+    }
+    m_state.wasBrushActive = brushCurrentlyActive;
 
     if (!shouldRenderFrame(cameraDirty)) {
         return;
@@ -438,6 +469,12 @@ void GLRenderer::applyPendingStrokes() {
         );
     }
 
+    // Capture le snapshot après l'application de tous les strokes
+    auto* terrainQml = m_viewport->terrainManagerTyped();
+    if (terrainQml) {
+        m_undoRedoManager.captureSnapshot(this, m_terrainGpu.heightmapTexture(), terrainQml->heightmapResolution());
+    }
+
     m_brushManager.clearPendingStrokes();
 }
 
@@ -456,6 +493,11 @@ void GLRenderer::applyContinuousBrush() {
     const float size = m_brushManager.brushSize();
     const float strength = m_brushManager.brushStrength();
     const BrushOpType operation = m_brushManager.operation();
+
+    // Active le mode batch si ce n'est pas déjà fait
+    if (!m_undoRedoManager.isBatching()) {
+        m_undoRedoManager.beginBatch();
+    }
 
     // Si l'opération est ErosionMaskAdd ou ErosionMaskErase, on applique le masque
     if (operation == BrushOpType::ErosionMaskAdd || operation == BrushOpType::ErosionMaskErase) {
@@ -571,4 +613,37 @@ void GLRenderer::clearErosionMask() {
     std::vector<uint8_t> zeroData(m_erosionMaskSize * m_erosionMaskSize, 0);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_erosionMaskSize, m_erosionMaskSize, GL_RED, GL_UNSIGNED_BYTE, zeroData.data());
     glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+
+void GLRenderer::performUndo() {
+    if (!m_state.terrainReady) {
+        LOG_WARN() << "Undo impossible: terrain non initialisé";
+        return;
+    }
+
+    if (m_undoRedoManager.undo(this, m_terrainGpu.heightmapTexture())) {
+        m_state.requestRedraw(RedrawReason::TerrainChanged);
+        // Force une mise à jour du viewport
+        if (m_viewport) {
+            QMetaObject::invokeMethod(m_viewport, "update", Qt::QueuedConnection);
+        }
+        LOG_DEBUG() << "Undo effectué - Nouvel index: " << m_undoRedoManager.currentIndex();
+    }
+}
+
+void GLRenderer::performRedo() {
+    if (!m_state.terrainReady) {
+        LOG_WARN() << "Redo impossible: terrain non initialisé";
+        return;
+    }
+
+    if (m_undoRedoManager.redo(this, m_terrainGpu.heightmapTexture())) {
+        m_state.requestRedraw(RedrawReason::TerrainChanged);
+        // Force une mise à jour du viewport
+        if (m_viewport) {
+            QMetaObject::invokeMethod(m_viewport, "update", Qt::QueuedConnection);
+        }
+        LOG_DEBUG() << "Redo effectué - Nouvel index: " << m_undoRedoManager.currentIndex();
+    }
 }

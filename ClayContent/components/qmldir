@@ -10,4 +10,9 @@ BrushOperations 1.0 BrushOperations.qml
 BrushContextMenu 1.0 BrushContextMenu.qml
 RightBar 1.0 RightBar.qml
 CustomSlider 1.0 CustomSlider.qml
-
+TerrainPopup 1.0 TerrainPopup.qml
+TerrainModeSelector 1.0 TerrainModeSelector.qml
+TerrainMeshSettings 1.0 TerrainMeshSettings.qml
+TerrainHeightmapSettings 1.0 TerrainHeightmapSettings.qml
+TerrainActions 1.0 TerrainActions.qml
+ToggleButton 1.0 ToggleButton.qml
