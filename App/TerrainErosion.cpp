@@ -216,8 +216,8 @@ void TerrainErosion::dispatch(QOpenGLExtraFunctions *gl, GLuint heightmapTexture
 
     ensureBuffers(gl, heightmapSize);
 
-    LOG_INFO() << "=== Début érosion (2 passes) ===";
-    LOG_INFO() << "Paramètres: particles=" << m_numParticles
+    LOG_DEBUG() << "=== Début érosion (2 passes) ===";
+    LOG_DEBUG() << "Paramètres: particles=" << m_numParticles
                << ", inertia=" << m_inertia
                << ", capacity=" << m_sedimentCapacity
                << ", deposition=" << m_depositionPercentage
@@ -331,11 +331,10 @@ void TerrainErosion::dispatch(QOpenGLExtraFunctions *gl, GLuint heightmapTexture
     m_secondPassProgram->release();
 
     convertFixedToFloatTexture(gl, heightmapTexture, heightmapSize);
-    LOG_INFO() << "Seconde passe terminée - Érosion appliquée";
+    LOG_DEBUG() << "Seconde passe terminée - Érosion appliquée";
 }
 
 void TerrainErosion::convertFloatToFixedTexture(QOpenGLExtraFunctions* gl, GLuint floatHeightmapTexture, int heightmapSize) const{
-    LOG_INFO() << "Conversion float -> fixed taille de texture: " << heightmapSize;
     m_convertFloatToFixedProgram->bind();
     gl->glBindImageTexture(0, floatHeightmapTexture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
     gl->glBindImageTexture(1, m_tempIntTexture,     0, GL_FALSE, 0, GL_WRITE_ONLY,GL_R32I);

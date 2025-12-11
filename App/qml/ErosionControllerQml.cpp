@@ -92,12 +92,12 @@ void ErosionControllerQml::setIsErosionRunning(bool val) {
 }
 
 void ErosionControllerQml::applyErosion() {
-    LOG_INFO() << "Érosion demandée depuis QML";
+    LOG_DEBUG() << "Érosion demandée depuis QML";
     emit erosionRequested();
 }
 
 void ErosionControllerQml::toggleErosion() {
     setIsErosionRunning(!m_isErosionRunning);
-    LOG_INFO() << "Érosion continue " << (m_isErosionRunning ? "démarrée" : "arrêtée");
+    LOG_DEBUG() << "Érosion continue " << (m_isErosionRunning ? "démarrée" : "arrêtée");
 }
 
