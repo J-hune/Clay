@@ -273,9 +273,12 @@ void GLRenderer::render() {
     applyContinuousBrush();
     drawFrame();
 
-    // Demande un nouveau rendu si le brush est actif (clic maintenu)
+    // Demande un nouveau rendu si nécessaire, càd si :
+    // - Brush actif (clic maintenu)
+    // - Caméra en mouvement (touches clavier ou souris)
     // Utilise QMetaObject::invokeMethod pour appeler update() dans le thread GUI
-    if (canApplyContinuousBrush()) {
+    const bool needsContinuousUpdate = canApplyContinuousBrush() || cameraDirty;
+    if (needsContinuousUpdate) {
         QMetaObject::invokeMethod(m_viewport, "update", Qt::QueuedConnection);
     }
 
