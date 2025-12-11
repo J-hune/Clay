@@ -233,3 +233,8 @@ void GLViewport::redo() {
     m_pendingRedo = true;
     update();
 }
+
+void GLViewport::captureSnapshot() {
+    m_pendingSnapshot = true;
+    update();
+}

@@ -92,6 +92,11 @@ void GLRenderer::syncExportRequest() {
         performRedo();
         m_viewport->m_pendingRedo = false;
     }
+
+    if (m_viewport->m_pendingSnapshot) {
+        performSnapshot();
+        m_viewport->m_pendingSnapshot = false;
+    }
 }
 
 void GLRenderer::syncErosion() {
@@ -494,10 +499,6 @@ void GLRenderer::applyContinuousBrush() {
     const float strength = m_brushManager.brushStrength();
     const BrushOpType operation = m_brushManager.operation();
 
-    // Active le mode batch si ce n'est pas déjà fait
-    if (!m_undoRedoManager.isBatching()) {
-        m_undoRedoManager.beginBatch();
-    }
 
     // Si l'opération est ErosionMaskAdd ou ErosionMaskErase, on applique le masque
     if (operation == BrushOpType::ErosionMaskAdd || operation == BrushOpType::ErosionMaskErase) {
@@ -505,6 +506,10 @@ void GLRenderer::applyContinuousBrush() {
         applyMaskAtPosition(hitPos, brushIdx, size, strength, erase);
     } else {
         // Sinon, on applique le brush normalement (Raise, Lower, Smooth)
+        // Active le mode batch si ce n'est pas déjà fait
+        if (!m_undoRedoManager.isBatching()) {
+            m_undoRedoManager.beginBatch();
+        }
         applyBrushAtPosition(hitPos, brushIdx, size, strength, operation);
     }
 }
@@ -647,3 +652,20 @@ void GLRenderer::performRedo() {
         LOG_DEBUG() << "Redo effectué - Nouvel index: " << m_undoRedoManager.currentIndex();
     }
 }
+
+void GLRenderer::performSnapshot() {
+    if (!m_state.terrainReady) {
+        LOG_WARN() << "Snapshot impossible: terrain non initialisé";
+        return;
+    }
+
+    auto* terrainQml = m_viewport->terrainManagerTyped();
+    if (!terrainQml) {
+        LOG_ERROR() << "TerrainManager non disponible";
+        return;
+    }
+
+    m_undoRedoManager.captureSnapshot(this, m_terrainGpu.heightmapTexture(), terrainQml->heightmapResolution());
+    LOG_INFO() << "Snapshot manuel capturé";
+}
+
