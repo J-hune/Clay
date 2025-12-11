@@ -21,6 +21,7 @@ GLRenderer::GLRenderer(GLViewport *viewport) : m_viewport(viewport) {
     m_terrainGpu.initialize(this);
     m_raycastController.initialize(this);
     m_brushOp.initialize(this);
+    m_erosionBrushOp.initialize(this);
 
     initializeBrushManager();
     linkQmlControllers();
@@ -208,6 +209,14 @@ void GLRenderer::syncTerrain() {
                    << ", scale=" << terrainQml->heightScale();
     }
 
+    // On s'assure que le masque d'érosion existe et correspond à la résolution de la heightmap
+    ensureErosionMaskTexture(terrainQml->heightmapResolution());
+    // On fournit le masque au système d'érosion
+    m_erosion.setErosionMaskTexture(m_erosionMaskTexture);
+
+    // Invalide les buffers d'érosion pour forcer leur recréation
+    m_erosion.invalidateBuffers();
+
     terrainQml->setNeedsUpload(false);
     m_state.terrainReady = true;
     m_state.requestRedraw(RedrawReason::TerrainChanged);
@@ -250,6 +259,10 @@ void GLRenderer::drawFrame() {
     // Calcule les matrices de projection et de vue
     QMatrix4x4 proj, view;
     SceneRenderer::computeMatrices(w, h, m_cameraController, proj, view);
+
+    // Mettre à jour l'overlay du masque d'érosion
+    m_terrainGpu.setErosionMaskTexture(m_erosionMaskTexture);
+    m_terrainGpu.setShowMaskOverlay(m_viewport ? m_viewport->m_erosionUiActive : false);
 
     // Dessine la scène complète (terrain, grille, axes)
     SceneRenderer::drawScene(
@@ -380,6 +393,35 @@ void GLRenderer::applyBrushAtPosition(const QVector3D &worldPos, int brushIndex,
     m_state.requestRedraw(RedrawReason::TerrainChanged);
 }
 
+void GLRenderer::applyMaskAtPosition(const QVector3D &worldPos, int brushIndex,
+                             float size, float strength, bool erase) {
+    if (!m_state.terrainReady || m_erosionMaskTexture == 0) return;
+
+    auto* terrainQml = m_viewport->terrainManagerTyped();
+    if (!terrainQml) return;
+
+    // Assure que la texture du masque existe et a la bonne taille
+    ensureErosionMaskTexture(terrainQml->heightmapResolution());
+
+    m_erosionBrushOp.applyMask(
+        this,
+        m_erosionMaskTexture,
+        m_erosionMaskSize,
+        worldPos,
+        size,
+        strength,
+        m_brushManager.brushTextureArrayId(),
+        brushIndex,
+        TERRAIN_MIN_X, TERRAIN_MAX_X,
+        TERRAIN_MIN_Z, TERRAIN_MAX_Z,
+        m_cameraController.camera().frontVector(),
+        erase
+    );
+
+    // Redessiner (overlay + preview)
+    m_state.requestRedraw(RedrawReason::TerrainChanged);
+}
+
 void GLRenderer::applyPendingStrokes() {
     if (!m_state.terrainReady) return;
 
@@ -409,13 +451,20 @@ void GLRenderer::applyContinuousBrush() {
     if (!m_state.terrainReady || !m_viewport) return;
     if (!canApplyContinuousBrush()) return;
 
-    applyBrushAtPosition(
-        m_raycastController.hitPosition(),
-        m_brushManager.currentBrushIndex(),
-        m_brushManager.brushSize(),
-        m_brushManager.brushStrength(),
-        m_brushManager.operation()
-    );
+    const QVector3D hitPos = m_raycastController.hitPosition();
+    const int brushIdx = m_brushManager.currentBrushIndex();
+    const float size = m_brushManager.brushSize();
+    const float strength = m_brushManager.brushStrength();
+    const BrushOpType operation = m_brushManager.operation();
+
+    // Si l'opération est ErosionMaskAdd ou ErosionMaskErase, on applique le masque
+    if (operation == BrushOpType::ErosionMaskAdd || operation == BrushOpType::ErosionMaskErase) {
+        const bool erase = (operation == BrushOpType::ErosionMaskErase);
+        applyMaskAtPosition(hitPos, brushIdx, size, strength, erase);
+    } else {
+        // Sinon, on applique le brush normalement (Raise, Lower, Smooth)
+        applyBrushAtPosition(hitPos, brushIdx, size, strength, operation);
+    }
 }
 
 QOpenGLFramebufferObject *GLRenderer::createFramebufferObject(const QSize &size) {
@@ -475,6 +524,8 @@ void GLRenderer::applyErosion() {
     }
 
     LOG_INFO() << "Application de l'érosion sur le terrain...";
+    // On s'assure que le masque est bien à jour côté système d'érosion
+    m_erosion.setErosionMaskTexture(m_erosionMaskTexture);
 
     // Applique l'érosion en 2 passes sur la heightmap GPU
     m_erosion.dispatch(
@@ -487,4 +538,37 @@ void GLRenderer::applyErosion() {
     m_state.requestRedraw(RedrawReason::TerrainChanged);
 
     LOG_INFO() << "Érosion appliquée avec succès";
+}
+
+void GLRenderer::ensureErosionMaskTexture(int size) {
+    if (size <= 0) return;
+
+    if (m_erosionMaskTexture == 0) {
+        glGenTextures(1, &m_erosionMaskTexture);
+    }
+
+    if (m_erosionMaskSize != size) {
+        m_erosionMaskSize = size;
+        glBindTexture(GL_TEXTURE_2D, m_erosionMaskTexture);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        // Alloue/resize la texture en GL_R8
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, size, size, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
+        // Clear à 0 pour commencer avec un masque vide
+        std::vector<uint8_t> zeroData(size * size, 0);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, size, size, GL_RED, GL_UNSIGNED_BYTE, zeroData.data());
+
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+}
+
+void GLRenderer::clearErosionMask() {
+    if (m_erosionMaskTexture == 0 || m_erosionMaskSize <= 0) return;
+    // Met tout à 0
+    glBindTexture(GL_TEXTURE_2D, m_erosionMaskTexture);
+    std::vector<uint8_t> zeroData(m_erosionMaskSize * m_erosionMaskSize, 0);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_erosionMaskSize, m_erosionMaskSize, GL_RED, GL_UNSIGNED_BYTE, zeroData.data());
+    glBindTexture(GL_TEXTURE_2D, 0);
 }

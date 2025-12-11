@@ -64,14 +64,15 @@ Rectangle {
         id: erosionController
         iterations: 1
         numParticles: 50000
-        inertia: 0.3
+        inertia: 0.5
         sedimentCapacity: 8.0
         depositionPercentage: 0.1
         erosionSpeed: 0.05
-        evaporationSpeed: 0.4
+        evaporationSpeed: 0.05
         gravity: 4.0
-        minSlope: 0.01
-        maxLifetime: 600
+        minSlope: 0.001
+        maxLifetime: 1000
+        erosionRadius: 3
     }
 
     // ========================================

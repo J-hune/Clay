@@ -1,15 +1,5 @@
-// ============================================================================
-// COMPUTE SHADER - GPU HYDRAULIC EROSION
-// ============================================================================
-// Architecture : 2 passes pour éviter les race conditions
-// Pass 1 : Simulation des particules + stockage des modifications
-// Pass 2 : Application des modifications sur la heightmap
-
 #version 430
 
-// ----------------------------------------------------------------------------
-// PASS 1 : SIMULATION DES PARTICULES
-// ----------------------------------------------------------------------------
 const int STEP_SIZE = 6;
 
 layout(local_size_x = 256) in;
@@ -17,6 +7,9 @@ layout(local_size_x = 256) in;
 // Buffers
 layout(binding = 0, r32i) uniform readonly iimage2D heightmapInt;
 uniform int fixedPointScale;    // ex: 10000
+// Masque d'érosion optionnel (R8, valeurs [0,1])
+layout(binding = 3, r8) uniform readonly image2D erosionMask;
+uniform int useMask; // 0 = pas de masque, 1 = masque actif
 layout(binding = 1, std430) buffer ParticleBuffer {
     vec4 particles[]; // xy=pos, z=sediment, w=water
 };
@@ -44,11 +37,6 @@ uniform int maxLifetime; // Nombre d'itération max pour une particule
 
 
 uniform vec2[] cornersBox; // Ca serait 4 coord qui forme un carré dans lequel on peut tiré des particules (a modifier si on veut d’autres formes) (potentiellement en coordonnée uv)
-
-
-// ============================================================================
-// FONCTIONS UTILITAIRES
-// ============================================================================
 
 // Générateur aléatoire simple (PCG)
 uint rngState;
@@ -104,10 +92,14 @@ vec2 calculateGradient(vec2 pos) {
     return vec2(gradX, gradY);
 }
 
+// Lecture du masque (true si la position est dans une zone érodable)
+bool maskAllows(vec2 pos) {
+    if (useMask == 0) return true;
+    ivec2 ip = ivec2(clamp(floor(pos), vec2(0.0), vec2(mapSize - 1.0)));
+    float m = imageLoad(erosionMask, ip).r; // [0,1] avec r8
+    return m > 0.001; // seuil léger
+}
 
-// ============================================================================
-// STOCKAGE DES MODIFICATIONS (sans race condition)
-// ============================================================================
 
 // Chaque particule écrit dans une zone unique du buffer de modifications
 // Structure : x, y, amount, radius, fx, fy
@@ -144,11 +136,6 @@ void storeDeposition(uint particleID, int step, vec2 pos, float amount) {
     modifications[baseIndex + 5] = fy;
 }
 
-
-// ============================================================================
-// SIMULATION PRINCIPALE
-// ============================================================================
-
 void main() {
     if (gl_GlobalInvocationID.x >= uint(numParticles)) {
         return; // Évite les invocations inutiles
@@ -163,6 +150,10 @@ void main() {
         mix(cornersBox[0].x, cornersBox[1].x, random()),
         mix(cornersBox[0].y, cornersBox[3].y, random())
     );
+    // Si un masque est actif et que la position de spawn n'est pas autorisée, on arrête cette particule
+    if (!maskAllows(pos)) {
+        return;
+    }
     vec2 dir = vec2(0.0);
     float speed = init_vel;
     float water = init_water;
@@ -195,6 +186,11 @@ void main() {
         if (newPos.x < 0.0 || newPos.x >= mapSize - 1.0 ||
         newPos.y < 0.0 || newPos.y >= mapSize - 1.0) {
             break;
+        }
+
+        // Si on sort de la zone masquée, on arrête la particule (aucune modification hors masque)
+        if (!maskAllows(newPos)) {
+                break;
         }
 
         // Nouvelle hauteur et delta

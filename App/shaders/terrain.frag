@@ -12,6 +12,10 @@ uniform sampler2DArray uBrushArray;
 uniform int uBrushIndex;
 uniform float uBrushSize;
 
+// Erosion mask overlay
+uniform sampler2D uErosionMask; // GL_R8 mask in [0,1]
+uniform float uMaskEnabled; // 1.0 if mask should be visualized
+
 in float vHeight;
 in vec2 vUV;
 in vec3 vWorldPos;
@@ -81,6 +85,17 @@ void main() {
 
             float texVal = texture(uBrushArray, vec3(local, float(uBrushIndex))).r;
             lit = mix(lit, vec3(0.627, 0.796, 0.835), texVal);
+        }
+    }
+
+    // Overlay erosion mask in blue for user feedback
+    if (uMaskEnabled > 0.5) {
+        float mask = texture(uErosionMask, vUV).r;
+        if (mask > 0.01) {
+            vec3 blue = vec3(0.1, 0.1, 0.9);
+            // Blend proportionally to mask value but keep it subtle
+            float a = clamp(mask, 0.2, 0.8);
+            lit = mix(lit, blue, a * 0.5);
         }
     }
 

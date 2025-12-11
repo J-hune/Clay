@@ -75,6 +75,11 @@ void GLViewport::setErosionController(QObject *controller) {
     emit erosionControllerChanged();
 }
 
+void GLViewport::setErosionUiActive(bool v) {
+    if (m_erosionUiActive == v) return;
+    m_erosionUiActive = v; emit erosionUiActiveChanged();
+}
+
 CameraControllerQml *GLViewport::cameraControllerTyped() const {
     return qobject_cast<CameraControllerQml *>(m_cameraController);
 }

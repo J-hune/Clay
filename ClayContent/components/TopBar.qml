@@ -100,7 +100,7 @@ Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     sourceSize.width: 18
                     sourceSize.height: 18
-                    source: "../images/erode.svg"
+                    source: "../images/erode_settings.svg"
                     fillMode: Image.PreserveAspectFit
                     opacity: erosionMouseArea.containsMouse ? 1.0 : 0.7
                 }
@@ -674,6 +674,19 @@ Rectangle {
             z: 10000
             visible: erosionPopupVisible
 
+            // Timer pour l'érosion continue
+            Timer {
+                id: erosionTimer
+                interval: 10 // 0.1 secondes
+                repeat: true
+                running: erosionController ? erosionController.isErosionRunning : false
+                onTriggered: {
+                    if (erosionController) {
+                        erosionController.applyErosion()
+                    }
+                }
+            }
+
             // Ombre portée
             layer.enabled: true
             layer.effect: ShaderEffect {
@@ -753,7 +766,13 @@ Rectangle {
                             width: 160
                             height: 40
                             radius: 6
-                            color: generateMouseAreaErosion.pressed ? "#5e81ac" : (generateMouseAreaErosion.containsMouse ? "#4c72a0" : "#4c566a")
+                            color: {
+                                if (erosionController && erosionController.isErosionRunning) {
+                                    return generateMouseAreaErosion.pressed ? "#bf616a" : (generateMouseAreaErosion.containsMouse ? "#d08770" : "#d08770")
+                                } else {
+                                    return generateMouseAreaErosion.pressed ? "#5e81ac" : (generateMouseAreaErosion.containsMouse ? "#4c72a0" : "#4c566a")
+                                }
+                            }
                             border.width: 0
 
                             Behavior on color {
@@ -764,7 +783,7 @@ Rectangle {
 
                             Text {
                                 anchors.centerIn: parent
-                                text: "Appliquer l'érosion"
+                                text: erosionController && erosionController.isErosionRunning ? "Arrêter érosion" : "Appliquer l'érosion"
                                 color: "#eceff4"
                                 font.pixelSize: 13
                                 font.weight: Font.DemiBold
@@ -775,7 +794,11 @@ Rectangle {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: erosionController.applyErosion()
+                                onClicked: {
+                                    if (erosionController) {
+                                        erosionController.toggleErosion()
+                                    }
+                                }
                             }
                         }
                     }
@@ -796,19 +819,6 @@ Rectangle {
 
 
 
-                        // Itérations
-                        /*CustomSlider {
-                            label: "Itérations"
-                            from: 1
-                            to: 10
-                            stepSize: 1
-                            decimals: 0
-                            primaryColor: "#5e81ac"
-                            textColor: "#d8dee9"
-                            value: erosionController ? erosionController.iterations : 10
-                            onValueChanged: if (erosionController) erosionController.iterations = value
-                            width: 200
-                        }*/
 
                         // Particules
                         CustomSlider {
@@ -828,7 +838,7 @@ Rectangle {
                         CustomSlider {
                             label: "Vitesse d'érosion"
                             from: 0.0
-                            to: 1.0
+                            to: 0.4
                             stepSize: 0.01
                             decimals: 2
                             primaryColor: "#5e81ac"
@@ -869,7 +879,7 @@ Rectangle {
                         // Inertie
                         CustomSlider {
                             label: "Inertie"
-                            from: 0.0
+                            from: 0.1
                             to: 1.0
                             stepSize: 0.01
                             decimals: 2
@@ -883,7 +893,7 @@ Rectangle {
                         // Évaporation
                         CustomSlider {
                             label: "Évaporation"
-                            from: 0.0
+                            from: 0.01
                             to: 0.5
                             stepSize: 0.001
                             decimals: 3
@@ -917,13 +927,13 @@ Rectangle {
                             decimals: 0
                             primaryColor: "#5e81ac"
                             textColor: "#d8dee9"
-                            value: erosionController && erosionController.erosionRadius !== undefined ? erosionController.erosionRadius : 1
-                            onValueChanged: if (erosionController && erosionController.erosionRadius !== undefined) erosionController.erosionRadius = value
+                            value: erosionController ? erosionController.erosionRadius : 1
+                            onValueChanged: if (erosionController) erosionController.erosionRadius = value
                             width: 200
                         }
 
                         // Durée de vie max
-                        CustomSlider {
+                        /*CustomSlider {
                             label: "Durée de vie max"
                             from: 1
                             to: 200
@@ -934,10 +944,10 @@ Rectangle {
                             value: erosionController ? erosionController.maxLifetime : 30
                             onValueChanged: if (erosionController) erosionController.maxLifetime = value
                             width: 200
-                        }
+                        }*/
 
                         // Gravité
-                        CustomSlider {
+                        /*CustomSlider {
                             label: "Gravité"
                             from: 0.0
                             to: 10.0
@@ -948,7 +958,7 @@ Rectangle {
                             value: erosionController ? erosionController.gravity : 4.0
                             onValueChanged: if (erosionController) erosionController.gravity = value
                             width: 200
-                        }
+                        }*/
                     }
                 }
             }
@@ -971,11 +981,16 @@ Rectangle {
             // Gestion de la touche Escape
             Keys.onEscapePressed: {
                 erosionPopupVisible = false
+                if (erosionController && erosionController.isErosionRunning) erosionController.toggleErosion();
             }
 
             focus: visible
             onVisibleChanged: {
-                if (visible) forceActiveFocus()
+                if (visible) {
+                    forceActiveFocus()
+                } else if (erosionController && erosionController.isErosionRunning) {
+                    erosionController.setIsErosionRunning(false)
+                }
             }
         }
     }
@@ -1026,6 +1041,7 @@ Rectangle {
                 // Le popup lui-même bloque ses propres clics avec son MouseArea
                 if (!clickInButton) {
                     erosionPopupVisible = false
+                    if (erosionController && erosionController.isErosionRunning) erosionController.toggleErosion();
                 }
                 mouse.accepted = false
             }

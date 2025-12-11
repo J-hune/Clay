@@ -125,17 +125,47 @@ void TerrainErosion::ensurePrograms(QOpenGLExtraFunctions *gl) {
 }
 
 void TerrainErosion::createTempIntTexture(QOpenGLExtraFunctions *gl, int heightmapSize) {
-    if (m_tempIntTexture == 0) gl->glGenTextures(1, &m_tempIntTexture);
+    // Si la texture existe déjà, la détruire (sera recréée avec la bonne taille)
+    if (m_tempIntTexture != 0) {
+        gl->glDeleteTextures(1, &m_tempIntTexture);
+        m_tempIntTexture = 0;
+    }
+
+    gl->glGenTextures(1, &m_tempIntTexture);
     gl->glBindTexture(GL_TEXTURE_2D, m_tempIntTexture);
     gl->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     gl->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     gl->glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32I, heightmapSize, heightmapSize);
     gl->glBindTexture(GL_TEXTURE_2D, 0);
+
+    LOG_INFO() << "Texture temporaire d'érosion créée (taille: " << heightmapSize << "x" << heightmapSize << ")";
 }
 
 void TerrainErosion::ensureBuffers(QOpenGLExtraFunctions *gl, int heightmapSize) {
+    // Si la taille n'a pas changé et que les buffers existent déjà, ne rien faire
     if (m_particleBuffer != 0 && m_lastHeightmapSize == heightmapSize) {
         return;
+    }
+
+    // Si la taille a changé, on doit TOUT recréer
+    const bool sizeChanged = (m_lastHeightmapSize != heightmapSize && m_lastHeightmapSize != 0);
+    if (sizeChanged) {
+        LOG_INFO() << "Changement de résolution détecté (" << m_lastHeightmapSize
+                   << " -> " << heightmapSize << "), recréation de tous les buffers d'érosion";
+
+        // Détruire les anciens buffers
+        if (m_particleBuffer != 0) {
+            gl->glDeleteBuffers(1, &m_particleBuffer);
+            m_particleBuffer = 0;
+        }
+        if (m_modBuffer != 0) {
+            gl->glDeleteBuffers(1, &m_modBuffer);
+            m_modBuffer = 0;
+        }
+        if (m_tempIntTexture != 0) {
+            gl->glDeleteTextures(1, &m_tempIntTexture);
+            m_tempIntTexture = 0;
+        }
     }
 
     m_lastHeightmapSize = heightmapSize;
@@ -151,21 +181,30 @@ void TerrainErosion::ensureBuffers(QOpenGLExtraFunctions *gl, int heightmapSize)
     gl->glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_particleBuffer);
     gl->glBufferData(GL_SHADER_STORAGE_BUFFER, particleDataSize, nullptr, GL_DYNAMIC_COPY);
     gl->glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    LOG_INFO() << "Buffers d'érosion créés pour " << numParticles << " particules";
 
     // Modification buffer (STEP_SIZE=6 floats par step)
     const int STEP_SIZE = 6;
     const GLsizeiptr modCount = GLsizeiptr(m_numParticles) * GLsizeiptr(m_maxLifetime);
     const GLsizeiptr modBytes = modCount * STEP_SIZE * sizeof(float);
-    if (m_modBuffer == 0) gl->glGenBuffers(1, &m_modBuffer);
+
+    if (m_modBuffer == 0) {
+        gl->glGenBuffers(1, &m_modBuffer);
+    }
+
     gl->glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_modBuffer);
     gl->glBufferData(GL_SHADER_STORAGE_BUFFER, modBytes, nullptr, GL_DYNAMIC_COPY);
-    // Optionnel: clear à 0
+    // clear à 0
     void* p = gl->glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, modBytes, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-    if (p) { std::memset(p, 0, size_t(modBytes)); gl->glUnmapBuffer(GL_SHADER_STORAGE_BUFFER); }
+    if (p) {
+        std::memset(p, 0, size_t(modBytes));
+        gl->glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    }
     gl->glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     createTempIntTexture(gl, heightmapSize);
+
+    LOG_INFO() << "Buffers d'érosion créés/mis à jour pour résolution " << heightmapSize
+               << " (" << numParticles << " particules)";
 }
 
 void TerrainErosion::dispatch(QOpenGLExtraFunctions *gl, GLuint heightmapTexture, int heightmapSize) {
@@ -178,8 +217,7 @@ void TerrainErosion::dispatch(QOpenGLExtraFunctions *gl, GLuint heightmapTexture
     ensureBuffers(gl, heightmapSize);
 
     LOG_INFO() << "=== Début érosion (2 passes) ===";
-    LOG_INFO() << "Paramètres: iterations=" << m_iterations
-               << ", particles=" << m_numParticles
+    LOG_INFO() << "Paramètres: particles=" << m_numParticles
                << ", inertia=" << m_inertia
                << ", capacity=" << m_sedimentCapacity
                << ", deposition=" << m_depositionPercentage
@@ -189,9 +227,14 @@ void TerrainErosion::dispatch(QOpenGLExtraFunctions *gl, GLuint heightmapTexture
                << ", minSlope=" << m_minSlope;
     convertFloatToFixedTexture(gl, heightmapTexture, heightmapSize);
 
+    // Vérifier si le masque d'érosion est actif
+    const bool hasMask = (m_erosionMaskTexture != 0);
+
     // === PREMIÈRE PASSE : Simulation des particules ===
     m_firstPassProgram->bind();
 
+    // Bind heightmap en lecture (DOIT être bindé AVANT le dispatch)
+    gl->glBindImageTexture(0, m_tempIntTexture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32I);
 
     // Bind particle buffer
     gl->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_particleBuffer);
@@ -212,6 +255,14 @@ void TerrainErosion::dispatch(QOpenGLExtraFunctions *gl, GLuint heightmapTexture
     m_firstPassProgram->setUniformValue("init_vel", m_initVelocity);
     m_firstPassProgram->setUniformValue("init_water", m_initWater);
     m_firstPassProgram->setUniformValue("fixedPointScale", m_fixedPointScale); // int
+
+    // Masque d'érosion (optionnel)
+    // Si une texture de masque a été fournie, on la bind en lecture sur l'unité d'image 3
+    // et on active le flag useMask côté shader. Sinon, on désactive le masque.
+    m_firstPassProgram->setUniformValue("useMask", hasMask ? 1 : 0);
+    if (hasMask) {
+        gl->glBindImageTexture(3, m_erosionMaskTexture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R8);
+    }
 
     // Box de spawn (4 coins)
     QVector2D corners[4] = {
@@ -239,43 +290,52 @@ void TerrainErosion::dispatch(QOpenGLExtraFunctions *gl, GLuint heightmapTexture
     const GLuint totalSteps = GLuint(m_numParticles * m_maxLifetime);
     const GLuint groupsForMods = (totalSteps + workGroupSize - 1) / workGroupSize;
 
-    for (int iter = 0; iter < m_iterations; ++iter) {
-        // Clear modifications buffer
-        gl->glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_modBuffer);
-        GLsizeiptr modBytes = GLsizeiptr(m_numParticles) * GLsizeiptr(m_maxLifetime) * STEP_SIZE * sizeof(float);
-        gl->glBufferData(GL_SHADER_STORAGE_BUFFER, modBytes, nullptr, GL_DYNAMIC_DRAW); // orphan + zero-cost on many drivers
-        gl->glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    // Clear modifications buffer
+    GLsizeiptr modBytes = GLsizeiptr(m_numParticles) * GLsizeiptr(m_maxLifetime) * STEP_SIZE * sizeof(float);
 
-        // Bind heightmap en lecture
-        gl->glBindImageTexture(0, m_tempIntTexture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32I);
+    gl->glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_modBuffer);
+    void* p = gl->glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, modBytes,
+        GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+    if (p) { memset(p, 0, (size_t)modBytes); gl->glUnmapBuffer(GL_SHADER_STORAGE_BUFFER); }
+    gl->glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-        // Lancer la première passe
-        m_firstPassProgram->bind();
-        m_firstPassProgram->setUniformValue("seed", iter * 12345 + 67890);
-        gl->glDispatchCompute(numGroups, 1, 1);
 
-        // Barrière mémoire pour s'assurer que la première passe est terminée
-        gl->glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-        m_firstPassProgram->release();
+    // Bind heightmap en lecture
+    gl->glBindImageTexture(0, m_tempIntTexture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32I);
 
-        // Lancer la seconde passe
-        m_secondPassProgram->bind();
-        // Re-bind heightmap et particle buffer
-        gl->glBindImageTexture(0, m_tempIntTexture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32I);
-        gl->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, m_modBuffer);
-        // Dispatch seconde passe en 1D
-        gl->glDispatchCompute(groupsForMods, 1, 1);
-        // Barrière mémoire pour s'assurer que la seconde passe est terminée
-        gl->glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-        m_secondPassProgram->release();
-
+    // Re-bind masque d'érosion si actif
+    if (hasMask) {
+        gl->glBindImageTexture(3, m_erosionMaskTexture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R8);
     }
+
+    // Lancer la première passe
+    m_firstPassProgram->bind();
+    // Choix d'une seed basé sur l'horloge interne de l'ordinateur
+    int seed = int(QDateTime::currentMSecsSinceEpoch() & 0xFFFFFFFF);
+    m_firstPassProgram->setUniformValue("seed", seed);
+    gl->glDispatchCompute(numGroups, 1, 1);
+
+    // Barrière mémoire pour s'assurer que la première passe est terminée
+    gl->glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    m_firstPassProgram->release();
+
+    // Lancer la seconde passe
+    m_secondPassProgram->bind();
+    // Re-bind heightmap et particle buffer
+    gl->glBindImageTexture(0, m_tempIntTexture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32I);
+    gl->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, m_modBuffer);
+    // Dispatch seconde passe en 1D
+    gl->glDispatchCompute(groupsForMods, 1, 1);
+    // Barrière mémoire pour s'assurer que la seconde passe est terminée
+    gl->glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    m_secondPassProgram->release();
+
     convertFixedToFloatTexture(gl, heightmapTexture, heightmapSize);
     LOG_INFO() << "Seconde passe terminée - Érosion appliquée";
 }
 
-void TerrainErosion::convertFloatToFixedTexture(QOpenGLExtraFunctions* gl, GLuint floatHeightmapTexture, int heightmapSize) const
-{
+void TerrainErosion::convertFloatToFixedTexture(QOpenGLExtraFunctions* gl, GLuint floatHeightmapTexture, int heightmapSize) const{
+    LOG_INFO() << "Conversion float -> fixed taille de texture: " << heightmapSize;
     m_convertFloatToFixedProgram->bind();
     gl->glBindImageTexture(0, floatHeightmapTexture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
     gl->glBindImageTexture(1, m_tempIntTexture,     0, GL_FALSE, 0, GL_WRITE_ONLY,GL_R32I);
@@ -308,6 +368,10 @@ TerrainErosion::~TerrainErosion() {
     // Ou manuellement si nécessaire
 }
 
-
-
+void TerrainErosion::invalidateBuffers() {
+    // Réinitialiser la taille mémorisée pour forcer la recréation
+    // lors du prochain appel à ensureBuffers
+    LOG_INFO() << "Invalidation des buffers d'érosion (seront recréés au prochain dispatch)";
+    m_lastHeightmapSize = 0;
+}
 

@@ -27,7 +27,7 @@ void main() {
     float amount = modifications[base + 2];
     int radius = int(modifications[base + 3]);
 
-    // si step non utilisé -> amount == 0.0 (ou very small)
+    // si step non utilisé -> amount == 0.0
     if (abs(amount) < 1e-8) return;
 
     // Dépôt (bilinear) : distribuer sur 4 texels
@@ -46,22 +46,43 @@ void main() {
         int delta01 = int(round(amount * float(fixedPointScale) * w01));
         int delta11 = int(round(amount * float(fixedPointScale) * w11));
 
-        // bounds check and atomic adds
+        // bounds check and atomic adds avec clamping pour ne pas dépasser fixedPointScale (= 1.0)
+        // Utiliser Compare-And-Swap pour garantir atomiquement les limites
         ivec2 p00 = ivec2(ix, iy);
-        if (p00.x >= 0 && p00.x < mapSize && p00.y >= 0 && p00.y < mapSize)
-        imageAtomicAdd(heightmap, p00, delta00);
+        if (p00.x >= 0 && p00.x < mapSize && p00.y >= 0 && p00.y < mapSize) {
+            int oldVal, newVal;
+            do {
+                oldVal = imageLoad(heightmap, p00).r;
+                newVal = min(oldVal + delta00, fixedPointScale);
+            } while (oldVal != imageAtomicCompSwap(heightmap, p00, oldVal, newVal));
+        }
 
         ivec2 p10 = ivec2(ix + 1, iy);
-        if (p10.x >= 0 && p10.x < mapSize && p10.y >= 0 && p10.y < mapSize)
-        imageAtomicAdd(heightmap, p10, delta10);
+        if (p10.x >= 0 && p10.x < mapSize && p10.y >= 0 && p10.y < mapSize) {
+            int oldVal, newVal;
+            do {
+                oldVal = imageLoad(heightmap, p10).r;
+                newVal = min(oldVal + delta10, fixedPointScale);
+            } while (oldVal != imageAtomicCompSwap(heightmap, p10, oldVal, newVal));
+        }
 
         ivec2 p01 = ivec2(ix, iy + 1);
-        if (p01.x >= 0 && p01.x < mapSize && p01.y >= 0 && p01.y < mapSize)
-        imageAtomicAdd(heightmap, p01, delta01);
+        if (p01.x >= 0 && p01.x < mapSize && p01.y >= 0 && p01.y < mapSize) {
+            int oldVal, newVal;
+            do {
+                oldVal = imageLoad(heightmap, p01).r;
+                newVal = min(oldVal + delta01, fixedPointScale);
+            } while (oldVal != imageAtomicCompSwap(heightmap, p01, oldVal, newVal));
+        }
 
         ivec2 p11 = ivec2(ix + 1, iy + 1);
-        if (p11.x >= 0 && p11.x < mapSize && p11.y >= 0 && p11.y < mapSize)
-        imageAtomicAdd(heightmap, p11, delta11);
+        if (p11.x >= 0 && p11.x < mapSize && p11.y >= 0 && p11.y < mapSize) {
+            int oldVal, newVal;
+            do {
+                oldVal = imageLoad(heightmap, p11).r;
+                newVal = min(oldVal + delta11, fixedPointScale);
+            } while (oldVal != imageAtomicCompSwap(heightmap, p11, oldVal, newVal));
+        }
 
     } else {
         // Érosion : distribuer sur un disque de 'radius' avec pondération linéaire
@@ -85,15 +106,13 @@ void main() {
                 float weight = max(0.0, float(r) - dist) / float(r); // linéaire
                 float deltaF = -amt * weight; // négatif
                 int deltaI = int(round(deltaF * float(fixedPointScale)));
-                // deltaI est négatif, imageAtomicAdd accepte int
 
-                // Interdire dépassement en dessous de 0 dans l'image heightmap
-                if (imageLoad(heightmap, ivec2(x, y)).r + deltaI < 0) {
-                    // ajuster deltaI pour ne pas descendre en dessous de 0
-                    deltaI = -imageLoad(heightmap, ivec2(x, y)).r;
-                }
-
-                imageAtomicAdd(heightmap, ivec2(x, y), deltaI);
+                // Utiliser Compare-And-Swap pour garantir atomiquement que la hauteur >= 0
+                int oldVal, newVal;
+                do {
+                    oldVal = imageLoad(heightmap, ivec2(x, y)).r;
+                    newVal = max(oldVal + deltaI, 0);
+                } while (oldVal != imageAtomicCompSwap(heightmap, ivec2(x, y), oldVal, newVal));
             }
         }
     }

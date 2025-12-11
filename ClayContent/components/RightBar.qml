@@ -101,6 +101,7 @@ Rectangle {
             BrushSection {
                 width: parent.width
                 brushManager: rightBar.brushManager
+                glView: rightBar.glView
             }
         }
 

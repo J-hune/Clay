@@ -23,6 +23,16 @@ public:
      */
     void dispatch(QOpenGLExtraFunctions *gl, GLuint heightmapTexture, int heightmapSize);
 
+    /**
+     * @brief Force la destruction et recréation de tous les buffers lors du prochain dispatch
+     * Utile lors d'un changement de résolution du terrain
+     */
+    void invalidateBuffers();
+
+    // Masque d'érosion (optionnel). Si défini, les particules ne sont générées
+    // que dans les zones où le masque > 0.
+    void setErosionMaskTexture(GLuint textureId) { m_erosionMaskTexture = textureId; }
+
     // Paramètres d'érosion (modifiables depuis QML)
     int iterations() const { return m_iterations; }
     void setIterations(int val) { m_iterations = val; }
@@ -54,6 +64,9 @@ public:
     int maxLifetime() const { return m_maxLifetime; }
     void setMaxLifetime(int val) { m_maxLifetime = val; }
 
+    int erosionRadius() const { return m_erosionRadius; }
+    void setErosionRadius(int val) { m_erosionRadius = val; }
+
 private:
     void ensurePrograms(QOpenGLExtraFunctions *gl);
     void ensureBuffers(QOpenGLExtraFunctions *gl, int heightmapSize);
@@ -73,6 +86,7 @@ private:
     GLuint m_particleBuffer = 0;
     GLuint m_modBuffer = 0;
     GLuint m_tempIntTexture = 0;
+    GLuint m_erosionMaskTexture = 0; // Texture 2D (R8/RG8/RGBA8) servant de masque d'érosion (optionnel)
     int m_lastHeightmapSize = 0;
 
     // Paramètres d'érosion (valeurs par défaut)
@@ -86,8 +100,8 @@ private:
     float m_gravity = 4.0f;          // Gravité [Pas besoin de changer, car selon l'article ca change rien a l'apparence du terrain]
     float m_minSlope = 0.001f;        // Pente minimale [min = 0.0001, max = 0.05, step = 0.0001, default = 0.001] [Tooltype = Plus c'est élevé et plus la particule s'arrêtera rapidement sur des pentes faibles]
     int m_maxLifetime = 30;          // Durée de vie max d'une particule
-    float m_initVelocity = 10.0f;
-    float m_initWater = 10.0f;
+    float m_initVelocity = 0.1f;
+    float m_initWater = 1.0f;
     int m_erosionRadius = 1; // Rayon d'érosion autour de la particule [min = 0, max = 6, step = 1, default = 1] [Tooltype = Plus c'est grand et plus l'érosion sera douce et étalée sur une large zone]
     int m_fixedPointScale = 100000;   // Échelle pour conversion float -> int
 };

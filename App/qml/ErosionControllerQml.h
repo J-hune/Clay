@@ -22,6 +22,8 @@ class ErosionControllerQml : public QObject {
     Q_PROPERTY(float gravity READ gravity WRITE setGravity NOTIFY gravityChanged)
     Q_PROPERTY(float minSlope READ minSlope WRITE setMinSlope NOTIFY minSlopeChanged)
     Q_PROPERTY(int maxLifetime READ maxLifetime WRITE setMaxLifetime NOTIFY maxLifetimeChanged)
+    Q_PROPERTY(int erosionRadius READ erosionRadius WRITE setErosionRadius NOTIFY erosionRadiusChanged)
+    Q_PROPERTY(bool isErosionRunning READ isErosionRunning WRITE setIsErosionRunning NOTIFY isErosionRunningChanged)
 
 public:
     explicit ErosionControllerQml(QObject *parent = nullptr);
@@ -41,6 +43,8 @@ public:
     float gravity() const { return m_erosion.gravity(); }
     float minSlope() const { return m_erosion.minSlope(); }
     int maxLifetime() const { return m_erosion.maxLifetime(); }
+    int erosionRadius() const { return m_erosion.erosionRadius(); }
+    bool isErosionRunning() const { return m_isErosionRunning; }
 
     // Setters
     void setIterations(int val);
@@ -53,9 +57,12 @@ public:
     void setGravity(float val);
     void setMinSlope(float val);
     void setMaxLifetime(int val);
+    void setErosionRadius(int val);
+    void setIsErosionRunning(bool val);
 
     // Méthodes invocables depuis QML
     Q_INVOKABLE void applyErosion();
+    Q_INVOKABLE void toggleErosion();
 
 signals:
     void iterationsChanged();
@@ -68,12 +75,15 @@ signals:
     void gravityChanged();
     void minSlopeChanged();
     void maxLifetimeChanged();
+    void erosionRadiusChanged();
+    void isErosionRunningChanged();
 
     // Signal pour notifier le renderer qu'une érosion doit être appliquée
     void erosionRequested();
 
 private:
     TerrainErosion m_erosion;
+    bool m_isErosionRunning = false;
 };
 
 #endif // CLAYAPP_EROSIONCONTROLLERQML_H

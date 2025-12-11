@@ -9,6 +9,8 @@ enum class BrushOpType {
     Raise = 0,
     Lower = 1,
     Smooth = 2,
+    ErosionMaskAdd = 3,
+    ErosionMaskErase = 4,
 };
 
 class TerrainBrushOp {
