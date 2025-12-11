@@ -62,9 +62,15 @@ Rectangle {
                     const globalX = mapToGlobal(Qt.point(m.x, m.y)).x;
                     // Tirer vers la gauche => augmente la largeur, vers la droite => la réduit
                     const delta = globalX - startX;
-                    const minW = 200;
-                    const maxW = 600;
-                    rightBar.width = Math.max(minW, Math.min(maxW, startW - delta));
+                    const minW = 324;
+                    const maxW = 800;
+                    
+                    // S'assurer que l'openGLArea reste au minimum 320px de large
+                    const parentWidth = rightBar.parent ? rightBar.parent.width : 1024;
+                    const maxAllowedWidth = parentWidth - 320;
+                    const effectiveMaxW = Math.min(maxW, maxAllowedWidth);
+                    
+                    rightBar.width = Math.max(minW, Math.min(effectiveMaxW, startW - delta));
                 }
             }
 

@@ -16,6 +16,12 @@ qt6_add_qml_module(ClayContent
         "components/BrushContextMenu.qml"
         "components/RightBar.qml"
         "components/CustomSlider.qml"
+        "components/TerrainPopup.qml"
+        "components/TerrainModeSelector.qml"
+        "components/TerrainMeshSettings.qml"
+        "components/TerrainHeightmapSettings.qml"
+        "components/TerrainActions.qml"
+        "components/ToggleButton.qml"
     RESOURCES
         "images/arrow-rotate-left.svg"
         "images/magnifying-glass-plus.svg"
@@ -39,5 +45,3 @@ qt6_add_qml_module(ClayContent
         "fonts/OpenSans-SemiBold.ttf"
         "components/qmldir"
 )
-
-

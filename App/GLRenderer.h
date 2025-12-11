@@ -12,6 +12,7 @@
 #include "ErosionBrushOp.h"
 #include "RenderState.h"
 #include "TerrainErosion.h"
+#include "UndoRedoManager.h"
 
 class GLViewport; // forward
 
@@ -24,7 +25,7 @@ public:
     QOpenGLFramebufferObject *createFramebufferObject(const QSize &size) override;
 
     bool exportHeightmap(const QString &filePath);
-    
+
     // Application de l'érosion
     void applyErosion();
 
@@ -60,6 +61,10 @@ private:
     void applyMaskAtPosition(const QVector3D &worldPos, int brushIndex,
                              float size, float strength, bool erase);
 
+    // Undo/Redo
+    void performUndo();
+    void performRedo();
+
     // Helpers
     void initializeBrushManager();
     void linkQmlControllers();
@@ -76,20 +81,23 @@ private:
 
     // Pointeur vers le viewport QML
     GLViewport *m_viewport = nullptr;
-    
+
     // État global du rendu (flags, cache, etc.)
     RenderState m_state;
-    
+
     // Ressources GPU pour le rendu du terrain
     TerrainGpu m_terrainGpu;
-    
+
     // Contrôleurs partagés entre le thread GUI et le thread de rendu
     CameraController m_cameraController;
     RaycastController m_raycastController;
     BrushManager m_brushManager;
-    
+
     // Opérateur de brush pour modifier le terrain
     TerrainBrushOp m_brushOp;
+
+    // Gestionnaire d'undo/redo
+    UndoRedoManager m_undoRedoManager;
 
     // Opérateur d'érosion de terrain
     TerrainErosion m_erosion;

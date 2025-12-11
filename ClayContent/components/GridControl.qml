@@ -19,101 +19,19 @@ Rectangle {
         spacing: 6
 
         // Bouton Grid
-        Rectangle {
+        ToggleButton {
             id: gridButton
-            width: 36
-            height: 36
-            radius: 6
-            color: {
-                if (gridMouseArea.pressed) return "#3a3d42"
-                if (glView.drawGrid) return "#2e3440"
-                if (gridMouseArea.containsMouse) return "#272a2f"
-                return "transparent"
-            }
-
-            Behavior on color { ColorAnimation { duration: 100 } }
-
-            // Indicateur d'activation
-            Rectangle {
-                width: 24
-                height: 2
-                radius: 1
-                color: "#5e81ac"
-                anchors.bottom: parent.bottom
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.bottomMargin: 4
-                visible: glView.drawGrid
-                opacity: glView.drawGrid ? 1.0 : 0.0
-                Behavior on opacity { NumberAnimation { duration: 150 } }
-            }
-
-            Image {
-                anchors.centerIn: parent
-                width: 20
-                height: 20
-                source: "../images/grid.svg"
-                fillMode: Image.PreserveAspectFit
-                opacity: glView.drawGrid ? 1.0 : 0.5
-
-                Behavior on opacity { NumberAnimation { duration: 100 } }
-            }
-
-            MouseArea {
-                id: gridMouseArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: glView.drawGrid = !glView.drawGrid
-            }
+            iconSource: "../images/grid.svg"
+            active: glView.drawGrid
+            onClicked: glView.drawGrid = !glView.drawGrid
         }
 
         // Bouton Axes
-        Rectangle {
+        ToggleButton {
             id: axesButton
-            width: 36
-            height: 36
-            radius: 6
-            color: {
-                if (axesMouseArea.pressed) return "#3a3d42"
-                if (glView.drawAxes) return "#2e3440"
-                if (axesMouseArea.containsMouse) return "#272a2f"
-                return "transparent"
-            }
-
-            Behavior on color { ColorAnimation { duration: 100 } }
-
-            // Indicateur d'activation
-            Rectangle {
-                width: 24
-                height: 2
-                radius: 1
-                color: "#5e81ac"
-                anchors.bottom: parent.bottom
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.bottomMargin: 4
-                visible: glView.drawAxes
-                opacity: glView.drawAxes ? 1.0 : 0.0
-                Behavior on opacity { NumberAnimation { duration: 150 } }
-            }
-
-            Image {
-                anchors.centerIn: parent
-                width: 20
-                height: 20
-                source: "../images/empty_axis.svg"
-                fillMode: Image.PreserveAspectFit
-                opacity: glView.drawAxes ? 1.0 : 0.5
-
-                Behavior on opacity { NumberAnimation { duration: 100 } }
-            }
-
-            MouseArea {
-                id: axesMouseArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: glView.drawAxes = !glView.drawAxes
-            }
+            iconSource: "../images/empty_axis.svg"
+            active: glView.drawAxes
+            onClicked: glView.drawAxes = !glView.drawAxes
         }
 
         // Séparateur

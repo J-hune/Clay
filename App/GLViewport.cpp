@@ -101,17 +101,30 @@ ErosionControllerQml *GLViewport::erosionControllerTyped() const {
 }
 
 void GLViewport::keyPressEvent(QKeyEvent *event) {
+    // Gestion des raccourcis undo/redo
+    if (event->modifiers() & Qt::ControlModifier) {
+        if (event->key() == Qt::Key_Z && !(event->modifiers() & Qt::ShiftModifier)) {
+            undo();
+            event->accept();
+            return;
+        } else if (event->key() == Qt::Key_Y || (event->key() == Qt::Key_Z && (event->modifiers() & Qt::ShiftModifier))) {
+            redo();
+            event->accept();
+            return;
+        }
+    }
+
     if (auto *camera = cameraControllerTyped()) {
         camera->handleKeyPress(event);
+        update();
     }
-    update();
 }
 
 void GLViewport::keyReleaseEvent(QKeyEvent *event) {
     if (auto *camera = cameraControllerTyped()) {
         camera->handleKeyRelease(event);
+        update();
     }
-    update();
 }
 
 void GLViewport::mousePressEvent(QMouseEvent *event) {
@@ -208,5 +221,15 @@ QQuickFramebufferObject::Renderer *GLViewport::createRenderer() const {
 void GLViewport::exportHeightmap(const QString &filePath) {
     // Stocker le chemin pour traitement dans le thread de rendu
     m_pendingExportPath = filePath;
+    update();
+}
+
+void GLViewport::undo() {
+    m_pendingUndo = true;
+    update();
+}
+
+void GLViewport::redo() {
+    m_pendingRedo = true;
     update();
 }
